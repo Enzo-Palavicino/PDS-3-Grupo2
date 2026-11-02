@@ -244,6 +244,27 @@ enlace a la plataforma (`PUBLIC_BASE_URL`); nunca envía datos clínicos al chat
 `TELEGRAM_DELETE_INCOMING=true`, además borra del chat el mensaje del profesional una vez
 procesado.
 
+## Plataforma web
+
+Con la aplicación corriendo, abre <http://localhost:8000> e inicia sesión con un usuario de
+demostración (la contraseña es la de `SEED_PASSWORD`). Las páginas son HTML simple renderizado
+en el servidor.
+
+| Página | Quién entra | Qué muestra |
+|---|---|---|
+| `/vinculos` | `directora` | Los profesionales y sus cuentas vinculadas. Genera el enlace de vinculación, con su código QR, y revoca vínculos. |
+| `/borradores` | `encargada_salud` (todos) y cada profesional (los suyos) | La lista de borradores con su residente, profesional, canal, faltantes y estado. |
+| `/borradores/{id}` | los mismos | Cada dato con su fragmento de origen, los mensajes de origen (con la transcripción), y lo que recibió la IA y qué modelo usó. Permite descartar el borrador. |
+
+- Cada vez que alguien abre un borrador queda un evento de auditoría de lectura, igual que al
+  iniciar sesión, descartar un borrador o revocar un vínculo.
+- Los fragmentos se guardan seudonimizados (`[RES-02]`); la web, que exige iniciar sesión, los
+  muestra con el nombre del residente.
+- La sesión vive en una cookie firmada con `SECRET_KEY`, dura 8 horas, y todos los formularios
+  llevan un token contra CSRF. Si falta `SECRET_KEY`, se usa una clave temporal y las sesiones
+  se cierran al reiniciar la aplicación.
+- Los enlaces que envía el bot llevan directo al borrador, después de iniciar sesión.
+
 ## Tests y lint
 
 ```bash
@@ -271,6 +292,7 @@ app/
   nucleo/         lógica que no depende del canal: vinculación, ingesta, worker, auditoría,
                   seudonimización y extracción
   proveedores/    proveedores de IA intercambiables por configuración: transcripción y LLM
+  web/            plataforma web: inicio de sesión, vínculos, borradores y sus plantillas
 migrations/       migraciones de Alembic
 scripts/          scripts de desarrollo, como la carga de datos de demostración
 tests/            tests automáticos

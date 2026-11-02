@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block titulo %}Borradores{% endblock %}
+{% block contenido %}
+<h1>Borradores de atención</h1>
+<p class="tenue">Los genera la IA a partir de los mensajes de los profesionales. Ninguno es una
+atención registrada hasta que un profesional lo revise.</p>
+
+{% if filas %}
+<div class="tabla">
+<table>
+  <thead>
+    <tr><th>#</th><th>Creado</th><th>Residente</th><th>Profesional</th><th>Canal</th>
+        <th>Falta</th><th>Estado</th></tr>
+  </thead>
+  <tbody>
+  {% for borrador, profesional, residente in filas %}
+    <tr>
+      <td><a href="/borradores/{{ borrador.id }}">#{{ borrador.id }}</a></td>
+      <td>{{ borrador.creado_en | hora_chile }}</td>
+      <td>
+        {% if residente %}{{ residente.nombres }} {{ residente.apellidos }}
+        {% else %}<span class="falta">Sin identificar</span>{% endif %}
+      </td>
+      <td>{{ profesional.nombre }}</td>
+      <td>{{ borrador.canal | capitalize }}</td>
+      <td>
+        {% if borrador.faltantes %}
+          {{ borrador.faltantes | map(attribute="descripcion") | join(", ") }}
+        {% else %}<span class="tenue">—</span>{% endif %}
+      </td>
+      <td><span class="etiqueta {{ borrador.estado }}">{{ borrador.estado }}</span></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p>Todavía no hay borradores.</p>
+{% endif %}
+{% endblock %}

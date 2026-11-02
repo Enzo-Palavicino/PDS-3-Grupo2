@@ -19,6 +19,10 @@ class Accion(StrEnum):
     VINCULO_REVOCADO = "vinculo_revocado"
     MENSAJE_RECIBIDO = "mensaje_recibido"
     MENSAJE_RECHAZADO = "mensaje_rechazado"  # remitente no vinculado
+    INICIO_SESION = "inicio_sesion"
+    INICIO_SESION_FALLIDO = "inicio_sesion_fallido"
+    BORRADOR_LEIDO = "borrador_leido"
+    BORRADOR_DESCARTADO = "borrador_descartado"
 
 
 def registrar_evento(

@@ -27,6 +27,9 @@ class Config(BaseSettings):
 
     # Dirección de la plataforma web, para los enlaces que envía el bot.
     public_base_url: str = "http://localhost:8000"
+    # Firma la cookie de sesión de la web. Si no se define, se genera una al azar al arrancar, y
+    # las sesiones se cierran cada vez que se reinicia la aplicación.
+    secret_key: SecretStr | None = None
 
     # Por defecto, un archivo SQLite en data/ (ignorada por git). En el servidor, PostgreSQL.
     database_url: str = "sqlite:///./data/app.db"

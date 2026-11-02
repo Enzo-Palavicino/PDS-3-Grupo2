@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block titulo %}Borrador #{{ borrador.id }}{% endblock %}
+{% block contenido %}
+<p><a href="/borradores">← Borradores</a></p>
+<h1>Borrador #{{ borrador.id }} <span class="etiqueta {{ borrador.estado }}">{{ borrador.estado }}</span></h1>
+<p class="tenue">
+  Residente:
+  {% if residente %}<strong>{{ residente.nombres }} {{ residente.apellidos }}</strong> ({{ residente.codigo }})
+  {% else %}<span class="falta">sin identificar</span>{% endif %}
+  · Profesional: {{ profesional.nombre }} ({{ profesional.especialidad }})
+  · {{ borrador.canal | capitalize }} · Creado el {{ borrador.creado_en | hora_chile }}
+</p>
+<p class="aviso">Borrador generado por IA: revisa cada dato con su fragmento de origen. No es una
+atención registrada.</p>
+
+{% if borrador.faltantes %}
+<section class="tarjeta">
+  <h2>Falta</h2>
+  <ul>
+  {% for falta in borrador.faltantes %}
+    <li class="{{ 'falta' if falta.obligatorio }}">
+      {{ falta.descripcion }}{% if not falta.obligatorio %} <span class="tenue">(esperado)</span>{% endif %}
+    </li>
+  {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+{% if borrador.ambiguedades %}
+<section class="tarjeta">
+  <h2>Ambigüedades</h2>
+  <ul>
+  {% for ambiguedad in borrador.ambiguedades %}
+    <li><strong>{{ ambiguedad.campo }}</strong>: {{ ambiguedad.motivo | con_nombres(nombres) }}</li>
+  {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<h2>Datos extraídos</h2>
+<div class="tabla">
+<table>
+  <thead><tr><th>Campo</th><th>Valor</th><th>Fragmento de origen</th></tr></thead>
+  <tbody>
+  {% for fila in campos %}
+    <tr>
+      <td>{{ fila.etiqueta }}</td>
+      <td>{% if fila.valor %}{{ fila.valor | con_nombres(nombres) }}{% else %}<span class="tenue">—</span>{% endif %}</td>
+      <td class="tenue">{% if fila.fragmento %}«{{ fila.fragmento | con_nombres(nombres) }}»{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<h2>Mensajes de origen</h2>
+{% for mensaje, transcripcion in mensajes %}
+<section class="tarjeta">
+  <p class="tenue">
+    {{ mensaje.canal | capitalize }} · {{ "Audio" if mensaje.tipo == "audio" else "Texto" }}
+    · {{ mensaje.recibido_en | hora_chile }}
+  </p>
+  {% if transcripcion %}
+    <p class="tenue">Transcripción ({{ transcripcion.proveedor }}, {{ transcripcion.modelo }}):</p>
+    <pre>{{ transcripcion.texto }}</pre>
+  {% else %}
+    <pre>{{ mensaje.texto or "—" }}</pre>
+  {% endif %}
+</section>
+{% endfor %}
+
+<h2>Procesamiento con IA</h2>
+{% for extraccion in extracciones %}
+<details class="tarjeta">
+  <summary>{{ extraccion.creado_en | hora_chile }} · {{ extraccion.proveedor }} ({{ extraccion.modelo }})</summary>
+  <p class="tenue">Lo que recibió la IA, ya seudonimizado:</p>
+  <pre>{{ extraccion.entrada_seudonimizada }}</pre>
+</details>
+{% endfor %}
+
+{% if puede_descartar %}
+<form method="post" action="/borradores/{{ borrador.id }}/descartar"
+      onsubmit="return confirm('¿Descartar el borrador #{{ borrador.id }}?')">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <button class="peligro">Descartar borrador</button>
+</form>
+{% endif %}
+{% endblock %}
