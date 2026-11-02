@@ -18,6 +18,13 @@ def test_transcribir_con_openai_exige_su_api_key(monkeypatch):
         Config(_env_file=None, stt_provider="openai")
 
 
+def test_extraer_con_openai_exige_su_api_key(monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    with pytest.raises(ValidationError, match="LLM_PROVIDER=openai requiere OPENAI_API_KEY"):
+        Config(_env_file=None, llm_provider="openai")
+
+
 def test_el_token_no_aparece_al_imprimir_la_configuracion():
     config = Config(_env_file=None, telegram_mode="polling", telegram_bot_token="123:secreto")
 

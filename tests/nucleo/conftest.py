@@ -1,13 +1,34 @@
-"""Utilidades para los tests del núcleo: un canal y un proveedor de transcripción falsos."""
+"""Utilidades para los tests del núcleo: residentes de prueba, y un canal y un proveedor de
+transcripción falsos."""
 
 import pytest
 
 from app.canales.base import AdaptadorCanal
-from app.modelos import MensajeEntrante
+from app.modelos import MensajeEntrante, Residente
 from app.nucleo.mensajes import registrar_mensaje_entrante
 from app.nucleo.procesamiento import Contexto
 from app.proveedores.stt.base import ProveedorSTT, ResultadoTranscripcion
 from app.proveedores.stt.fake import ProveedorSTTFake
+from scripts.sembrar_datos import RESIDENTES
+
+
+@pytest.fixture
+def residentes() -> list[Residente]:
+    """Los 4 residentes ficticios de la demo, sin guardarlos en la base de datos."""
+    return [
+        Residente(
+            id=numero,
+            codigo=codigo,
+            nombres=nombres,
+            apellidos=apellidos,
+            apodo=apodo,
+            fecha_nacimiento=nacimiento,
+            nivel=nivel,
+        )
+        for numero, (codigo, nombres, apellidos, apodo, nacimiento, nivel) in enumerate(
+            RESIDENTES, start=1
+        )
+    ]
 
 
 class CanalFalso(AdaptadorCanal):

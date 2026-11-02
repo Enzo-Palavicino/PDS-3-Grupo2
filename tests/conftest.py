@@ -17,6 +17,7 @@ from app.modelos import Profesional
 # para hacerlo: las variables de entorno tienen prioridad sobre .env.
 os.environ["TELEGRAM_MODE"] = "off"
 os.environ["STT_PROVIDER"] = "fake"
+os.environ["LLM_PROVIDER"] = "fake"
 
 RAIZ = Path(__file__).resolve().parent.parent
 

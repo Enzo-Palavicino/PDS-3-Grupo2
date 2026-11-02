@@ -31,17 +31,26 @@ class Config(BaseSettings):
     # Transcripción de audios. fake: devuelve un texto fijo (tests y pruebas sin API key).
     stt_provider: Literal["fake", "openai"] = "fake"
     stt_model: str = "gpt-transcribe"
-    openai_api_key: SecretStr | None = None
     # Carpeta donde se guarda cada audio solo mientras se transcribe. Por defecto, la carpeta
     # temporal del usuario: fuera del repositorio y de OneDrive.
     audio_dir: Path = Path(tempfile.gettempdir()) / "pds3-audios"
+
+    # Extracción de los campos con IA. fake: no usa IA y deja los campos vacíos (tests).
+    llm_provider: Literal["fake", "openai"] = "fake"
+    llm_model: str = "gpt-6-luna"
+
+    # La API key de OpenAI que entregó el curso: sirve para la transcripción y para el LLM.
+    openai_api_key: SecretStr | None = None
 
     @model_validator(mode="after")
     def _exigir_credenciales(self) -> "Config":
         if self.telegram_mode != "off" and not self.telegram_bot_token:
             raise ValueError(f"TELEGRAM_MODE={self.telegram_mode} requiere TELEGRAM_BOT_TOKEN")
-        if self.stt_provider == "openai" and not self.openai_api_key:
-            raise ValueError("STT_PROVIDER=openai requiere OPENAI_API_KEY")
+        if not self.openai_api_key:
+            if self.stt_provider == "openai":
+                raise ValueError("STT_PROVIDER=openai requiere OPENAI_API_KEY")
+            if self.llm_provider == "openai":
+                raise ValueError("LLM_PROVIDER=openai requiere OPENAI_API_KEY")
         return self
 
 

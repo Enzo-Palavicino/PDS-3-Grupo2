@@ -151,8 +151,8 @@ avisa al profesional.
 
 - `fake`, por defecto: devuelve siempre "Transcripción de prueba" y no necesita API key. Sirve
   para los tests y para probar el flujo completo.
-- `openai`: usa la API de OpenAI con el modelo de `STT_MODEL` (`gpt-transcribe`). Necesita
-  `OPENAI_API_KEY`.
+- `openai`: usa `gpt-transcribe` (`STT_MODEL`) con la API key de OpenAI que entregó el curso
+  (ver [API key de OpenAI](#api-key-de-openai)).
 
 El audio se descarga a un archivo temporal en `AUDIO_DIR` (por defecto, la carpeta temporal del
 sistema, fuera del repositorio), se transcribe y se borra apenas termina el intento, aunque haya
@@ -162,6 +162,55 @@ fallado. La transcripción queda en la tabla `transcripciones`; el bot nunca la 
 cambio, no se puede seudonimizar antes de transcribirlo, así que el proveedor de transcripción
 recibe datos identificables. En producción hay que usar una cuenta configurada sin retención de
 datos, o un modelo local como Whisper. En desarrollo y en la demo se usan solo datos ficticios.
+
+## Extracción con IA
+
+Un LLM convierte el texto libre del registro (escrito o transcrito) en los campos del "Registro
+de Atención y Control de Salud": residente, fecha, lugar, motivo, diagnósticos, indicaciones,
+próximo control, acompañante, etc. Cada campo trae el fragmento del texto que lo respalda.
+
+1. **Seudonimización** (`app/nucleo/seudonimizacion.py`): los nombres, apellidos y apodos de los
+   residentes se reemplazan por su código (`[RES-02]`), sin importar mayúsculas ni tildes y
+   tolerando errores menores de transcripción. Un nombre que comparten dos residentes queda
+   como `[RES-01|RES-04]`. RUT, teléfonos y correos se reemplazan por `[RUT]`, `[TEL]` y
+   `[EMAIL]`. Limitación: los nombres de quienes no son residentes (familiares, funcionarios)
+   no se detectan.
+2. **Extracción** (`app/nucleo/extraccion.py`): el LLM recibe el texto seudonimizado, la fecha
+   de referencia en hora de Chile y los códigos de los residentes con su nivel y edad (nunca
+   nombres). Las instrucciones le prohíben inventar datos.
+3. **Validación**: se descarta todo dato cuyo fragmento no aparezca en el texto, y las fechas
+   con formato inválido. El residente lo decide el sistema con lo que encontró la
+   seudonimización: un nombre ambiguo o dos residentes en un mismo mensaje quedan registrados
+   como ambigüedad.
+
+`LLM_PROVIDER` elige el proveedor:
+
+- `fake`, por defecto: no usa IA y deja todos los campos vacíos. Sirve para los tests.
+- `openai`: usa `gpt-6-luna` (`LLM_MODEL`) con la API key de OpenAI que entregó el curso, con
+  salida estructurada en modo estricto: la API obliga a que la respuesta cumpla el esquema.
+
+### API key de OpenAI
+
+El curso entregó una API key de OpenAI por grupo. Solo permite los modelos `gpt-6-luna`,
+`gpt-transcribe`, `text-embedding-3-small` y `text-embedding-3-large`. Va en `.env`:
+
+```
+STT_PROVIDER=openai
+LLM_PROVIDER=openai
+OPENAI_API_KEY=<la key del curso>
+```
+
+Nunca la subas al repositorio (es público) ni la compartas por chat: si se filtra, la pueden
+desactivar y el grupo se queda sin ella.
+
+Para probar la extracción sin pasar por el bot (con la base de datos creada y los datos de
+demostración cargados):
+
+```bash
+python -m scripts.probar_extraccion "Hoy atendí a Emilia Soto en el Hogar..."
+```
+
+Muestra lo que recibió el LLM y los datos extraídos ya validados.
 
 ## Tests y lint
 
@@ -187,8 +236,9 @@ app/
   canales/
     base.py       tipos comunes a todos los canales: MensajeNormalizado y AdaptadorCanal
     telegram/     cliente de la Bot API, adaptador y polling
-  nucleo/         lógica que no depende del canal: vinculación, ingesta, worker y auditoría
-  proveedores/    proveedores de IA intercambiables por configuración (por ahora, transcripción)
+  nucleo/         lógica que no depende del canal: vinculación, ingesta, worker, auditoría,
+                  seudonimización y extracción
+  proveedores/    proveedores de IA intercambiables por configuración: transcripción y LLM
 migrations/       migraciones de Alembic
 scripts/          scripts de desarrollo, como la carga de datos de demostración
 tests/            tests automáticos
