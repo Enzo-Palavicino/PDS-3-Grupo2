@@ -141,9 +141,16 @@ registros", y su mensaje no se guarda.
 
 Cada mensaje que el bot guarda lo procesa en segundo plano un worker: un hilo dentro de la misma
 aplicación, que usa la tabla `mensajes_entrantes` como cola. Así, recibir un mensaje nunca
-espera a la transcripción ni a la IA. Si un paso falla, el worker guarda solo el tipo de error y
-lo reintenta a los 10 s y a los 60 s. Si falla 3 veces, el mensaje queda en `error` y el bot le
-avisa al profesional.
+espera a la transcripción ni a la IA. Los pasos dependen del estado del mensaje:
+
+```
+recibido ─(audio: transcribir)─► transcrito ─(IA y borrador)─► extraido ─(responder)─► listo
+```
+
+Cada paso guarda su avance antes del siguiente. Si uno falla, el worker guarda solo el tipo de
+error y lo reintenta desde ese mismo paso a los 10 s y a los 60 s: por ejemplo, si falló el envío
+de la respuesta, no vuelve a llamar a la IA. Si falla 3 veces, el mensaje queda en `error` y el
+bot le avisa al profesional.
 
 ### Transcripción de audios
 
@@ -211,6 +218,31 @@ python -m scripts.probar_extraccion "Hoy atendí a Emilia Soto en el Hogar..."
 ```
 
 Muestra lo que recibió el LLM y los datos extraídos ya validados.
+
+## Borradores y respuestas del bot
+
+Con los campos extraídos, el worker arma un **borrador de atención**. Nunca es una atención
+registrada: siempre la revisa un profesional en la plataforma. Si el profesional le responde al
+mensaje del bot sobre un borrador pendiente suyo, su respuesta completa ese mismo borrador; si
+no, cada mensaje crea uno nuevo.
+
+Reglas (sección 10 de la especificación):
+
+- Un borrador completo necesita residente, fecha de atención y diagnóstico o motivo. Si falta
+  alguno, queda como faltante.
+- El próximo control y el acompañante (nombre y cargo) son esperados: si faltan, se informan,
+  pero no bloquean el borrador.
+- El bot pide lo que falta una sola vez. Si el profesional completa el borrador respondiendo,
+  el bot solo confirma la actualización.
+- Una pregunta ("¿qué alergias tiene…?") no crea borrador: el bot responde que por este canal
+  solo recibe registros. Es pregunta si el LLM la marca como consulta o si tiene "?", siempre
+  que el mensaje no traiga datos de una atención (diagnósticos, indicaciones, etc.).
+- La especialidad no la extrae la IA: se toma del profesional vinculado.
+
+El bot responde solo con el número del borrador, las iniciales del residente, lo que falta y el
+enlace a la plataforma (`PUBLIC_BASE_URL`); nunca envía datos clínicos al chat. Con
+`TELEGRAM_DELETE_INCOMING=true`, además borra del chat el mensaje del profesional una vez
+procesado.
 
 ## Tests y lint
 

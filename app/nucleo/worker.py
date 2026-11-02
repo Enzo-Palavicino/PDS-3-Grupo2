@@ -3,15 +3,15 @@
 La tabla mensajes_entrantes funciona como cola. El worker toma los mensajes pendientes en orden
 de llegada y los procesa de a uno, en un hilo aparte, para que recibir mensajes nunca tenga que
 esperar a la transcripción ni a la IA. Si un mensaje falla, guarda el tipo de error y lo
-reintenta más tarde, con esperas cada vez más largas. Si falla 3 veces, lo deja en "error" y le
-avisa al profesional.
+reintenta más tarde desde el paso que falló, con esperas cada vez más largas. Si falla 3 veces,
+lo deja en "error" y le avisa al profesional.
 """
 
 import logging
 import threading
 from datetime import timedelta
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.db import ahora
@@ -84,13 +84,7 @@ class Worker:
         consulta = (
             select(MensajeEntrante.id)
             .where(
-                or_(
-                    MensajeEntrante.estado.in_(ESTADOS_PENDIENTES),
-                    and_(
-                        MensajeEntrante.estado == EstadoMensaje.ERROR,
-                        MensajeEntrante.intentos < MAXIMO_INTENTOS,
-                    ),
-                ),
+                MensajeEntrante.estado.in_(ESTADOS_PENDIENTES),
                 or_(
                     MensajeEntrante.proximo_intento_en.is_(None),
                     MensajeEntrante.proximo_intento_en <= ahora(),
@@ -103,7 +97,9 @@ class Worker:
 
     def _procesar(self, mensaje_id: int) -> None:
         try:
-            with self._fabrica.begin() as sesion:
+            # procesar() guarda el avance después de cada paso; si un paso falla, al cerrar la
+            # sesión se descarta solo lo que ese paso no alcanzó a guardar.
+            with self._fabrica() as sesion:
                 procesar(sesion, sesion.get(MensajeEntrante, mensaje_id), self._contexto)
         except Exception as error:
             # Solo el tipo de error: su mensaje podría incluir datos del registro.
@@ -120,12 +116,13 @@ class Worker:
     def _registrar_fallo(self, mensaje_id: int, tipo_de_error: str) -> None:
         with self._fabrica.begin() as sesion:
             mensaje = sesion.get(MensajeEntrante, mensaje_id)
-            mensaje.estado = EstadoMensaje.ERROR
             mensaje.intentos += 1
             mensaje.ultimo_error = tipo_de_error
             if mensaje.intentos < MAXIMO_INTENTOS:
+                # Conserva su estado, para que el reintento siga desde el paso que falló.
                 mensaje.proximo_intento_en = ahora() + ESPERAS_ENTRE_INTENTOS[mensaje.intentos - 1]
                 return
+            mensaje.estado = EstadoMensaje.ERROR
             mensaje.proximo_intento_en = None
             canal, destino, id_externo = mensaje.canal, mensaje.destino_respuesta, mensaje.id_externo
         logger.error("El mensaje %s quedó en error tras %s intentos", mensaje_id, MAXIMO_INTENTOS)

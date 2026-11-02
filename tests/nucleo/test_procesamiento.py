@@ -22,7 +22,7 @@ def test_una_nota_de_voz_se_transcribe_y_el_audio_se_borra(
     assert transcripcion.texto == "Transcripción de prueba"
     assert (transcripcion.proveedor, transcripcion.modelo) == ("fake", "fake")
     assert transcripcion.duracion_seg == 7
-    assert mensaje.estado == EstadoMensaje.TRANSCRITO
+    assert mensaje.estado == EstadoMensaje.LISTO
     assert list(contexto.carpeta_audios.iterdir()) == []
 
 
@@ -44,7 +44,7 @@ def test_un_texto_no_necesita_transcripcion(sesion, contexto, guardar_mensaje):
     procesar(sesion, mensaje, contexto)
     sesion.commit()
 
-    assert mensaje.estado == EstadoMensaje.TRANSCRITO
+    assert mensaje.estado == EstadoMensaje.LISTO
     assert contar_transcripciones(sesion) == 0
 
 

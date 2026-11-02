@@ -1,8 +1,11 @@
 """Procesamiento en segundo plano de cada mensaje que guardó la ingesta.
 
-Cada paso revisa primero si su resultado ya existe, así que repetirlo no hace daño: si un intento
-falla a la mitad, el reintento sigue desde donde quedó. Por ahora el único paso es transcribir
-los audios; los textos no lo necesitan.
+Los pasos dependen del estado del mensaje, y cada uno guarda su avance en la base de datos
+antes del siguiente. Así, si un paso falla, el reintento sigue desde ese paso: por ejemplo, si
+falló el envío de la respuesta, no se vuelve a llamar a la IA.
+
+    recibido ─(audio: descargar y transcribir)─► transcrito ─(IA y borrador)─► extraido
+             ─(responder en el chat)─► listo
 """
 
 import logging
@@ -14,13 +17,25 @@ from sqlalchemy.orm import Session
 
 from app.canales.base import AdaptadorCanal
 from app.logs import trazas_habilitadas
-from app.modelos import EstadoMensaje, MensajeEntrante, Transcripcion
+from app.modelos import EstadoMensaje, MensajeEntrante, Residente, Transcripcion
+from app.nucleo import textos
+from app.nucleo.borradores import (
+    armar_borrador,
+    borrador_del_mensaje,
+    texto_de_respuesta,
+)
+from app.proveedores.llm.base import ProveedorLLM
 from app.proveedores.stt.base import ProveedorSTT
 
 logger = logging.getLogger(__name__)
 
 # Estados de los mensajes que todavía tienen pasos por hacer.
-ESTADOS_PENDIENTES = (EstadoMensaje.RECIBIDO, EstadoMensaje.DESCARGADO)
+ESTADOS_PENDIENTES = (
+    EstadoMensaje.RECIBIDO,
+    EstadoMensaje.DESCARGADO,
+    EstadoMensaje.TRANSCRITO,
+    EstadoMensaje.EXTRAIDO,
+)
 
 # Extensión del archivo temporal según el tipo de audio: la API de transcripción la usa para
 # reconocer el formato.
@@ -41,17 +56,39 @@ class Contexto:
 
     adaptadores: dict[str, AdaptadorCanal]  # un adaptador por canal: "telegram", "whatsapp"
     stt: ProveedorSTT
+    llm: ProveedorLLM
     carpeta_audios: Path
+    url_publica: str = "http://localhost:8000"  # base de los enlaces que envía el bot
+    borrar_mensajes_importados: bool = False
 
 
 def procesar(sesion: Session, mensaje: MensajeEntrante, contexto: Contexto) -> None:
-    """Hace los pasos pendientes del mensaje. Si alguno falla, la excepción llega al worker, que
-    registra el error y programa un reintento."""
+    """Hace los pasos que le faltan al mensaje. Si alguno falla, la excepción llega al worker,
+    que registra el error y programa un reintento."""
+    if mensaje.estado not in ESTADOS_PENDIENTES:
+        return
     adaptador = contexto.adaptadores[mensaje.canal]
     _indicar_procesando(adaptador, mensaje)
-    if mensaje.tipo == "audio":
-        _transcribir(sesion, mensaje, adaptador, contexto)
-    mensaje.estado = EstadoMensaje.TRANSCRITO
+
+    if mensaje.estado in (EstadoMensaje.RECIBIDO, EstadoMensaje.DESCARGADO):
+        if mensaje.tipo == "audio":
+            _transcribir(sesion, mensaje, adaptador, contexto)
+        mensaje.estado = EstadoMensaje.TRANSCRITO
+        sesion.commit()
+
+    if mensaje.estado == EstadoMensaje.TRANSCRITO:
+        if armar_borrador(sesion, mensaje, contexto.llm) is None:
+            # Era una consulta: el bot no responde preguntas sobre los residentes.
+            adaptador.enviar_texto(mensaje.destino_respuesta, textos.SOLO_REGISTROS, mensaje.id_externo)
+            mensaje.estado = EstadoMensaje.LISTO
+        else:
+            mensaje.estado = EstadoMensaje.EXTRAIDO
+        sesion.commit()
+
+    if mensaje.estado == EstadoMensaje.EXTRAIDO:
+        _responder(sesion, mensaje, adaptador, contexto)
+        mensaje.estado = EstadoMensaje.LISTO
+        sesion.commit()
 
 
 def _indicar_procesando(adaptador: AdaptadorCanal, mensaje: MensajeEntrante) -> None:
@@ -99,3 +136,34 @@ def _transcribir(
         )
     )
     logger.info("Mensaje %s transcrito con %s", mensaje.id, resultado.modelo)
+
+
+def _responder(
+    sesion: Session, mensaje: MensajeEntrante, adaptador: AdaptadorCanal, contexto: Contexto
+) -> None:
+    borrador = borrador_del_mensaje(sesion, mensaje)
+    residente = sesion.get(Residente, borrador.residente_id) if borrador.residente_id else None
+    # Si el borrador ya tiene un mensaje del bot, lo que falta ya se pidió una vez.
+    ya_se_pidio = borrador.mensaje_bot_id_externo is not None
+    texto = texto_de_respuesta(borrador, residente, ya_se_pidio, contexto.url_publica)
+    # Se guarda el id del mensaje del bot: si el profesional le responde, completa este borrador.
+    borrador.mensaje_bot_id_externo = adaptador.enviar_texto(
+        mensaje.destino_respuesta, texto, mensaje.id_externo
+    )
+    logger.info("Respuesta enviada para el borrador %s", borrador.id)
+    if contexto.borrar_mensajes_importados:
+        _borrar_del_chat(adaptador, mensaje)
+
+
+def _borrar_del_chat(adaptador: AdaptadorCanal, mensaje: MensajeEntrante) -> None:
+    try:
+        if not adaptador.borrar_mensaje(mensaje.destino_respuesta, mensaje.id_externo):
+            logger.info("El mensaje %s ya no se podía borrar del chat", mensaje.id)
+    except Exception as error:
+        # El registro ya quedó guardado y respondido: un borrado fallido no se reintenta.
+        logger.warning(
+            "No se pudo borrar del chat el mensaje %s (%s)",
+            mensaje.id,
+            type(error).__name__,
+            exc_info=trazas_habilitadas(),
+        )

@@ -22,6 +22,11 @@ class Config(BaseSettings):
     telegram_bot_token: SecretStr | None = None
     # off: no recibe mensajes (tests y CI). polling: desarrollo local con getUpdates.
     telegram_mode: Literal["off", "polling"] = "off"
+    # true: el bot borra del chat el mensaje del profesional una vez procesado.
+    telegram_delete_incoming: bool = False
+
+    # Dirección de la plataforma web, para los enlaces que envía el bot.
+    public_base_url: str = "http://localhost:8000"
 
     # Por defecto, un archivo SQLite en data/ (ignorada por git). En el servidor, PostgreSQL.
     database_url: str = "sqlite:///./data/app.db"

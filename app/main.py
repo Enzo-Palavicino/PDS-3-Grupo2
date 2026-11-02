@@ -16,6 +16,7 @@ from app.logs import configurar_logs
 from app.nucleo.ingesta import enviar_respuestas, ingerir
 from app.nucleo.procesamiento import Contexto
 from app.nucleo.worker import Worker
+from app.proveedores.llm import crear_proveedor_llm
 from app.proveedores.stt import crear_proveedor_stt
 
 logger = logging.getLogger(__name__)
@@ -42,7 +43,10 @@ def crear_app(config: Config | None = None) -> FastAPI:
             contexto = Contexto(
                 adaptadores={"telegram": adaptador},
                 stt=crear_proveedor_stt(config),
+                llm=crear_proveedor_llm(config),
                 carpeta_audios=config.audio_dir,
+                url_publica=config.public_base_url,
+                borrar_mensajes_importados=config.telegram_delete_incoming,
             )
             worker = Worker(fabrica_de_sesiones, contexto)
 

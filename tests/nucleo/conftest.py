@@ -7,6 +7,7 @@ from app.canales.base import AdaptadorCanal
 from app.modelos import MensajeEntrante, Residente
 from app.nucleo.mensajes import registrar_mensaje_entrante
 from app.nucleo.procesamiento import Contexto
+from app.proveedores.llm.fake import ProveedorLLMFake
 from app.proveedores.stt.base import ProveedorSTT, ResultadoTranscripcion
 from app.proveedores.stt.fake import ProveedorSTTFake
 from scripts.sembrar_datos import RESIDENTES
@@ -41,6 +42,8 @@ class CanalFalso(AdaptadorCanal):
         self.audio = (b"audio-de-prueba", "audio/ogg")  # lo que devuelve descargar_audio()
         self.descargas = 0
         self.enviados = []  # (destino, texto, responder_a)
+        self.envios_que_fallan = 0  # cuántos envíos fallan antes de que el canal responda
+        self.borrados = []  # (destino, id_mensaje_externo)
         self.procesando = []  # destinos donde se mostró "escribiendo…"
 
     def parsear(self, evento):
@@ -54,10 +57,14 @@ class CanalFalso(AdaptadorCanal):
         return self.audio
 
     def enviar_texto(self, destino, texto, responder_a=None):
+        if self.envios_que_fallan > 0:
+            self.envios_que_fallan -= 1
+            raise ConnectionError("el canal no responde")
         self.enviados.append((destino, texto, responder_a))
         return f"{destino}:{900 + len(self.enviados)}"
 
     def borrar_mensaje(self, destino, id_mensaje_externo):
+        self.borrados.append((destino, id_mensaje_externo))
         return True
 
     def indicar_procesando(self, destino):
@@ -97,8 +104,18 @@ def contexto(canal_falso, tmp_path) -> Contexto:
     return Contexto(
         adaptadores={"telegram": canal_falso},
         stt=ProveedorSTTFake(),
+        llm=ProveedorLLMFake(),
         carpeta_audios=tmp_path / "audios",
+        url_publica="http://localhost:8000",
     )
+
+
+@pytest.fixture
+def residentes_guardados(sesion, residentes) -> list[Residente]:
+    """Los 4 residentes de la demo, guardados en la base de datos del test."""
+    sesion.add_all(residentes)
+    sesion.commit()
+    return residentes
 
 
 @pytest.fixture

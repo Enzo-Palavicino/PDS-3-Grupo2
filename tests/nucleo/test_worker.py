@@ -28,8 +28,8 @@ def test_procesa_los_mensajes_pendientes(fabrica_de_sesiones, contexto, guardar_
 
     assert Worker(fabrica_de_sesiones, contexto).procesar_pendientes() == 2
 
-    assert leer(fabrica_de_sesiones, texto.id).estado == EstadoMensaje.TRANSCRITO
-    assert leer(fabrica_de_sesiones, nota_de_voz.id).estado == EstadoMensaje.TRANSCRITO
+    assert leer(fabrica_de_sesiones, texto.id).estado == EstadoMensaje.LISTO
+    assert leer(fabrica_de_sesiones, nota_de_voz.id).estado == EstadoMensaje.LISTO
 
 
 def test_un_mensaje_que_falla_se_reintenta_despues_de_esperar(
@@ -42,7 +42,8 @@ def test_un_mensaje_que_falla_se_reintenta_despues_de_esperar(
     worker.procesar_pendientes()
 
     fallido = leer(fabrica_de_sesiones, mensaje.id)
-    assert fallido.estado == EstadoMensaje.ERROR
+    # Conserva su estado mientras le queden reintentos: el reintento sigue desde ese paso.
+    assert fallido.estado == EstadoMensaje.RECIBIDO
     assert fallido.intentos == 1
     assert fallido.ultimo_error == "RuntimeError"
     assert fallido.proximo_intento_en > ahora() + timedelta(seconds=5)
@@ -52,8 +53,8 @@ def test_un_mensaje_que_falla_se_reintenta_despues_de_esperar(
     cumplir_la_espera(fabrica_de_sesiones, mensaje.id)
     worker.procesar_pendientes()
 
-    assert leer(fabrica_de_sesiones, mensaje.id).estado == EstadoMensaje.TRANSCRITO
-    assert canal_falso.enviados == []
+    assert leer(fabrica_de_sesiones, mensaje.id).estado == EstadoMensaje.LISTO
+    assert textos.ERROR not in [texto for _, texto, _ in canal_falso.enviados]
     assert list(contexto.carpeta_audios.iterdir()) == []
 
 
@@ -74,6 +75,24 @@ def test_despues_de_3_fallos_queda_en_error_y_se_avisa_una_sola_vez(
     assert final.intentos == MAXIMO_INTENTOS
     assert final.proximo_intento_en is None
     assert canal_falso.enviados == [("55667788", textos.ERROR, "55667788:412")]
+
+
+def test_si_falla_el_envio_de_la_respuesta_el_reintento_no_vuelve_a_llamar_a_la_ia(
+    fabrica_de_sesiones, contexto, guardar_mensaje, canal_falso
+):
+    canal_falso.envios_que_fallan = 1
+    mensaje = guardar_mensaje()
+    worker = Worker(fabrica_de_sesiones, contexto)
+
+    worker.procesar_pendientes()
+    assert leer(fabrica_de_sesiones, mensaje.id).estado == EstadoMensaje.EXTRAIDO
+
+    cumplir_la_espera(fabrica_de_sesiones, mensaje.id)
+    worker.procesar_pendientes()
+
+    assert leer(fabrica_de_sesiones, mensaje.id).estado == EstadoMensaje.LISTO
+    assert len(contexto.llm.entradas) == 1  # la IA se llamó una sola vez
+    assert len(canal_falso.enviados) == 1
 
 
 def test_el_log_de_un_fallo_no_incluye_su_contenido(
@@ -112,7 +131,7 @@ def test_al_despertarlo_procesa_un_mensaje_nuevo_sin_esperar_la_revision(
         worker.despertar()
 
         limite = time.monotonic() + 5
-        while leer(fabrica_de_sesiones, mensaje.id).estado != EstadoMensaje.TRANSCRITO:
+        while leer(fabrica_de_sesiones, mensaje.id).estado != EstadoMensaje.LISTO:
             assert time.monotonic() < limite, "el worker no procesó el mensaje"
             time.sleep(0.05)
     finally:

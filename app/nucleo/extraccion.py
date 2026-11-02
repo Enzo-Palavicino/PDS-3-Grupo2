@@ -71,6 +71,9 @@ class Ambiguedad(BaseModel):
 
 
 class RegistroExtraido(BaseModel):
+    # True si el mensaje pide información en vez de informar una atención. No se guarda en el
+    # borrador: solo sirve para que una pregunta no cree uno.
+    es_consulta: bool = False
     residente: Campo | None = None
     fecha_atencion: Campo | None = None
     hora_atencion: Campo | None = None
@@ -131,9 +134,14 @@ Reglas:
 5. Escribe las fechas como AAAA-MM-DD y las horas como HH:MM (24 horas). Resuelve las
    expresiones relativas ("hoy", "ayer", "en dos semanas") con la fecha de referencia.
 6. lugar es "Hogar", "CESFAM", "Hospital Luis Calvo Mackenna" u otro lugar que se nombre.
-7. Cada medicamento indicado es un elemento de indicaciones_farmacologicas. Las demás
-   indicaciones (aseo nasal, reposo, dieta) van en otras_indicaciones.
+7. Cada medicamento indicado es un elemento de indicaciones_farmacologicas. Su fecha_inicio y
+   su fecha_termino van solo si el texto las dice: no las calcules con la duración ni supongas
+   que empieza hoy. Las demás indicaciones (aseo nasal, reposo, dieta) van en
+   otras_indicaciones.
 8. Si un dato es dudoso o contradictorio, agrégalo a ambiguedades con el campo y el motivo.
+9. es_consulta es true solo si el mensaje pregunta o pide información (por ejemplo, "¿qué
+   alergias tiene...?") en vez de informar una atención. En ese caso deja los demás campos
+   vacíos.
 """
 
 DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
