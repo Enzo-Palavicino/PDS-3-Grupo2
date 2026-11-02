@@ -6,12 +6,13 @@ pendiente suyo, cada mensaje crea uno nuevo.
 """
 
 import logging
+from datetime import datetime, timedelta
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db import cerrar_transaccion
+from app.db import ahora, cerrar_transaccion
 from app.modelos import (
     BorradorAtencion,
     BorradorMensaje,
@@ -175,6 +176,15 @@ def calcular_faltantes(registro: RegistroExtraido) -> list[dict[str, Any]]:
     elif sin_cargo:
         falta("acompanante", "cargo del acompañante", obligatorio=False)
     return faltantes
+
+
+def sin_actividad(
+    borrador: BorradorAtencion, dias: int, momento: datetime | None = None
+) -> bool:
+    """Regla 9: un borrador pendiente que no cambia hace más de `dias` días queda marcado para
+    que alguien lo revise y lo complete o lo descarte. Es solo una marca: nunca se borra solo."""
+    limite = (momento or ahora()) - timedelta(days=dias)
+    return borrador.estado == EstadoBorrador.PENDIENTE and borrador.actualizado_en < limite
 
 
 def texto_de_respuesta(

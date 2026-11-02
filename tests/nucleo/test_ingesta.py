@@ -180,3 +180,13 @@ def test_ingerir_guarda_en_su_propia_transaccion_y_se_envia_la_respuesta(
 
     assert canal_falso.enviados == [("55667788", textos.RECIBIDO, "55667788:412")]
     assert contar_mensajes(sesion) == 1
+
+
+def test_si_falla_una_respuesta_se_registra_y_se_envian_las_demas(canal_falso, caplog):
+    canal_falso.envios_que_fallan = 1
+    respuestas = [Respuesta("55667788", "primera"), Respuesta("55667788", "segunda")]
+
+    enviar_respuestas(canal_falso, respuestas)
+
+    assert canal_falso.enviados == [("55667788", "segunda", None)]
+    assert "No se pudo enviar una respuesta al chat (ConnectionError)" in caplog.text

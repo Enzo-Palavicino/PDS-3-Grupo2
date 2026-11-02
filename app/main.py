@@ -79,7 +79,9 @@ def crear_app(config: Config | None = None) -> FastAPI:
             if config.telegram_mode == "polling":
 
                 def manejar_update(update: dict[str, Any]) -> None:
-                    enviar_respuestas(adaptador, ingerir(fabrica_de_sesiones, adaptador, update))
+                    respuestas = ingerir(fabrica_de_sesiones, adaptador, update)
+                    # Si falla una respuesta, se registra y se sigue: el worker se despierta igual.
+                    enviar_respuestas(adaptador, respuestas)
                     worker.despertar()  # si se guardó un mensaje, se procesa en segundo plano
 
                 polling = PollingTelegram(cliente, manejar_update)
@@ -105,6 +107,8 @@ def crear_app(config: Config | None = None) -> FastAPI:
         redoc_url=None if en_servidor else "/redoc",
         openapi_url=None if en_servidor else "/openapi.json",
     )
+    # Las rutas web leen de aquí la configuración, como los días sin actividad de un borrador.
+    app.state.config = config
     app.add_middleware(
         SessionMiddleware,
         secret_key=_clave_de_sesion(config),

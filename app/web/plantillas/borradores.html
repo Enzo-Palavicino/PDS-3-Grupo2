@@ -4,6 +4,10 @@
 <h1>Borradores de atención</h1>
 <p class="tenue">Los genera la IA a partir de los mensajes de los profesionales. Ninguno es una
 atención registrada hasta que un profesional lo revise.</p>
+{% if ids_sin_actividad %}
+<p class="aviso">Los borradores marcados <span class="etiqueta sin-actividad">sin actividad</span>
+no cambian hace más de {{ dias_sin_actividad }} días: revísalos y complétalos o descártalos.</p>
+{% endif %}
 
 {% if filas %}
 <div class="tabla">
@@ -28,7 +32,12 @@ atención registrada hasta que un profesional lo revise.</p>
           {{ borrador.faltantes | map(attribute="descripcion") | join(", ") }}
         {% else %}<span class="tenue">—</span>{% endif %}
       </td>
-      <td><span class="etiqueta {{ borrador.estado }}">{{ borrador.estado }}</span></td>
+      <td>
+        <span class="etiqueta {{ borrador.estado }}">{{ borrador.estado }}</span>
+        {% if borrador.id in ids_sin_actividad %}
+          <span class="etiqueta sin-actividad">sin actividad</span>
+        {% endif %}
+      </td>
     </tr>
   {% endfor %}
   </tbody>

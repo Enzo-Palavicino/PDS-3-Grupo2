@@ -3,8 +3,8 @@
 La tabla mensajes_entrantes funciona como cola. El worker toma los mensajes pendientes en orden
 de llegada y los procesa de a uno, en un hilo aparte, para que recibir mensajes nunca tenga que
 esperar a la transcripción ni a la IA. Si un mensaje falla, guarda el tipo de error y lo
-reintenta más tarde desde el paso que falló, con esperas cada vez más largas. Si falla 3 veces,
-lo deja en "error" y le avisa al profesional.
+reintenta más tarde desde el paso que falló, con esperas cada vez más largas (o la que pida el
+canal, si es mayor). Si falla 3 veces, lo deja en "error" y le avisa al profesional.
 """
 
 import logging
@@ -14,6 +14,7 @@ from datetime import timedelta
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.canales.base import ErrorDeCanal
 from app.db import ahora
 from app.logs import trazas_habilitadas
 from app.modelos import EstadoMensaje, MensajeEntrante
@@ -115,18 +116,20 @@ class Worker:
                 type(error).__name__,
                 exc_info=trazas_habilitadas(),
             )
-            self._registrar_fallo(mensaje_id, type(error).__name__)
+            self._registrar_fallo(mensaje_id, error)
         else:
             logger.info("Mensaje %s procesado", mensaje_id)
 
-    def _registrar_fallo(self, mensaje_id: int, tipo_de_error: str) -> None:
+    def _registrar_fallo(self, mensaje_id: int, error: Exception) -> None:
         with self._fabrica.begin() as sesion:
             mensaje = sesion.get(MensajeEntrante, mensaje_id)
             mensaje.intentos += 1
-            mensaje.ultimo_error = tipo_de_error
+            mensaje.ultimo_error = type(error).__name__
             if mensaje.intentos < MAXIMO_INTENTOS:
                 # Conserva su estado, para que el reintento siga desde el paso que falló.
-                mensaje.proximo_intento_en = ahora() + ESPERAS_ENTRE_INTENTOS[mensaje.intentos - 1]
+                mensaje.proximo_intento_en = ahora() + _espera_antes_de_reintentar(
+                    mensaje.intentos, error
+                )
                 return
             mensaje.estado = EstadoMensaje.ERROR
             mensaje.proximo_intento_en = None
@@ -154,3 +157,12 @@ class Worker:
         for archivo in carpeta.iterdir():
             if archivo.is_file():
                 archivo.unlink(missing_ok=True)
+
+
+def _espera_antes_de_reintentar(intentos: int, error: Exception) -> timedelta:
+    """La espera que corresponde a los intentos hechos, o la que pidió el canal si es mayor (por
+    ejemplo, Telegram indica cuántos segundos esperar cuando se supera su límite de mensajes)."""
+    espera = ESPERAS_ENTRE_INTENTOS[intentos - 1]
+    if isinstance(error, ErrorDeCanal) and error.reintentar_en:
+        espera = max(espera, timedelta(seconds=error.reintentar_en))
+    return espera

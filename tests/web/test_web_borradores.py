@@ -1,3 +1,6 @@
+from datetime import timedelta
+
+from app.db import ahora
 from app.modelos import EstadoBorrador
 
 # Quién ve qué
@@ -123,3 +126,36 @@ def test_descartar_sin_token_csrf_se_rechaza(cliente, entrar, crear_borrador):
     respuesta = cliente.post(f"/borradores/{borrador.id}/descartar", data={})
 
     assert respuesta.status_code == 403
+
+
+# Borradores sin actividad (regla 9)
+
+
+def dejar_sin_cambios(sesion, borrador, dias: int) -> None:
+    """Simula que el borrador no cambia hace `dias` días."""
+    borrador.actualizado_en = ahora() - timedelta(days=dias)
+    sesion.commit()
+
+
+def test_un_borrador_sin_cambios_hace_mas_de_30_dias_aparece_marcado(
+    cliente, entrar, crear_borrador, sesion
+):
+    antiguo = crear_borrador("pediatra")
+    dejar_sin_cambios(sesion, antiguo, dias=31)
+    entrar("pediatra")
+
+    assert "etiqueta sin-actividad" in cliente.get("/borradores").text
+    detalle = cliente.get(f"/borradores/{antiguo.id}").text
+    assert "etiqueta sin-actividad" in detalle
+    assert "revísalo y complétalo o descártalo" in detalle
+
+
+def test_un_borrador_con_cambios_recientes_no_aparece_marcado(
+    cliente, entrar, crear_borrador, sesion
+):
+    reciente = crear_borrador("pediatra")
+    dejar_sin_cambios(sesion, reciente, dias=29)
+    entrar("pediatra")
+
+    assert "etiqueta sin-actividad" not in cliente.get("/borradores").text
+    assert "etiqueta sin-actividad" not in cliente.get(f"/borradores/{reciente.id}").text

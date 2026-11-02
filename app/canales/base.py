@@ -38,6 +38,16 @@ class Ignorado:
     motivo: str
 
 
+class ErrorDeCanal(Exception):
+    """Error al comunicarse con un canal. Su mensaje nunca incluye tokens ni URL que los lleven."""
+
+    def __init__(self, descripcion: str, reintentar_en: int | None = None):
+        super().__init__(descripcion)
+        # Segundos que el canal pide esperar antes de volver a intentar, cuando se superó su
+        # límite de mensajes (en Telegram, el error 429). None si no pidió nada.
+        self.reintentar_en = reintentar_en
+
+
 class AdaptadorCanal(ABC):
     """Interfaz que implementa cada canal. Es lo único que el núcleo conoce de un canal."""
 

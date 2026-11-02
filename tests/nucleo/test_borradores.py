@@ -1,8 +1,10 @@
 import json
+from datetime import timedelta
 
 import pytest
 from sqlalchemy import func, select
 
+from app.db import ahora
 from app.modelos import (
     BorradorAtencion,
     BorradorMensaje,
@@ -12,7 +14,7 @@ from app.modelos import (
     Profesional,
 )
 from app.nucleo import textos
-from app.nucleo.borradores import calcular_faltantes
+from app.nucleo.borradores import calcular_faltantes, sin_actividad
 from app.nucleo.extraccion import RegistroExtraido
 from app.nucleo.mensajes import registrar_mensaje_entrante
 from app.nucleo.procesamiento import procesar
@@ -299,3 +301,25 @@ def test_al_acompanante_le_puede_faltar_solo_el_cargo():
     )
 
     assert "cargo del acompañante" in [f["descripcion"] for f in calcular_faltantes(registro)]
+
+
+# Borradores sin actividad (regla 9)
+
+
+@pytest.mark.parametrize(
+    ("dias_sin_cambios", "estado", "marcado"),
+    [
+        (31, EstadoBorrador.PENDIENTE, True),
+        (29, EstadoBorrador.PENDIENTE, False),
+        # Un borrador descartado ya se revisó: no se marca aunque sea antiguo.
+        (31, EstadoBorrador.DESCARTADO, False),
+    ],
+)
+def test_un_borrador_pendiente_sin_cambios_en_30_dias_queda_marcado(
+    dias_sin_cambios, estado, marcado
+):
+    borrador = BorradorAtencion(
+        estado=estado, actualizado_en=ahora() - timedelta(days=dias_sin_cambios)
+    )
+
+    assert sin_actividad(borrador, dias=30) is marcado

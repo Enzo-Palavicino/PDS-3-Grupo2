@@ -20,6 +20,8 @@ from app.web.plantillas import pagina
 
 router = APIRouter()
 
+# Página de inicio de cada rol. Cada rol tiene una sola sección: después de iniciar sesión, solo
+# se vuelve a páginas dentro de ella.
 PAGINA_INICIAL = {
     Rol.DIRECTORA: "/vinculos",
     Rol.ENCARGADA_SALUD: "/borradores",
@@ -126,7 +128,11 @@ def cerrar_sesion(request: Request):
 
 
 def _destino(siguiente: str, usuario: UsuarioWeb) -> str:
-    # Solo se vuelve a páginas de este mismo sitio: empiezan con "/", pero no con "//".
-    if siguiente.startswith("/") and not siguiente.startswith("//"):
+    """A dónde ir después de iniciar sesión: a la página pedida si es de la sección del rol (las
+    demás le responderían 403, como un enlace de borrador abierto por la directora) y, si no, a
+    su página de inicio."""
+    inicio = PAGINA_INICIAL[usuario.rol]
+    # Como inicio empieza con "/" y una letra, esto también impide redirigir a otro sitio.
+    if siguiente == inicio or siguiente.startswith((f"{inicio}/", f"{inicio}?")):
         return siguiente
-    return PAGINA_INICIAL[usuario.rol]
+    return inicio

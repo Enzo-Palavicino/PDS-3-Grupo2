@@ -43,6 +43,7 @@ class CanalFalso(AdaptadorCanal):
         self.descargas = 0
         self.enviados = []  # (destino, texto, responder_a)
         self.envios_que_fallan = 0  # cuántos envíos fallan antes de que el canal responda
+        self.error_de_envio: Exception = ConnectionError("el canal no responde")
         self.borrados = []  # (destino, id_mensaje_externo)
         self.procesando = []  # destinos donde se mostró "escribiendo…"
 
@@ -59,7 +60,7 @@ class CanalFalso(AdaptadorCanal):
     def enviar_texto(self, destino, texto, responder_a=None):
         if self.envios_que_fallan > 0:
             self.envios_que_fallan -= 1
-            raise ConnectionError("el canal no responde")
+            raise self.error_de_envio
         self.enviados.append((destino, texto, responder_a))
         return f"{destino}:{900 + len(self.enviados)}"
 

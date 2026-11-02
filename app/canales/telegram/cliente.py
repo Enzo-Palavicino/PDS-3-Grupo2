@@ -11,6 +11,8 @@ from typing import Any
 
 import httpx2
 
+from app.canales.base import ErrorDeCanal
+
 URL_API = "https://api.telegram.org"
 
 # getUpdates mantiene la petición abierta hasta 30 s esperando mensajes nuevos (long polling),
@@ -19,17 +21,19 @@ ESPERA_GET_UPDATES_SEG = 30
 TIMEOUT = httpx2.Timeout(10.0, read=ESPERA_GET_UPDATES_SEG + 10)
 
 
-class ErrorTelegram(Exception):
-    """Error al llamar a la Bot API. Su mensaje nunca incluye la URL, porque lleva el token."""
+class ErrorTelegram(ErrorDeCanal):
+    """Error al llamar a la Bot API. Su mensaje nunca incluye la URL, porque lleva el token.
+
+    reintentar_en (de ErrorDeCanal) trae los segundos que Telegram pide esperar cuando se supera
+    su límite de mensajes (error 429).
+    """
 
     def __init__(
         self, descripcion: str, codigo: int | None = None, reintentar_en: int | None = None
     ):
-        super().__init__(descripcion)
+        super().__init__(descripcion, reintentar_en=reintentar_en)
         # error_code de Telegram, o None si fue un error de red.
         self.codigo = codigo
-        # Segundos que Telegram pide esperar cuando se supera su límite de mensajes (error 429).
-        self.reintentar_en = reintentar_en
 
 
 class ClienteBotTelegram:

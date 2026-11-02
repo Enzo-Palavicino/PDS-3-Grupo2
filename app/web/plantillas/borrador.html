@@ -2,7 +2,8 @@
 {% block titulo %}Borrador #{{ borrador.id }}{% endblock %}
 {% block contenido %}
 <p><a href="/borradores">← Borradores</a></p>
-<h1>Borrador #{{ borrador.id }} <span class="etiqueta {{ borrador.estado }}">{{ borrador.estado }}</span></h1>
+<h1>Borrador #{{ borrador.id }} <span class="etiqueta {{ borrador.estado }}">{{ borrador.estado }}</span>
+  {% if marcado_sin_actividad %}<span class="etiqueta sin-actividad">sin actividad</span>{% endif %}</h1>
 <p class="tenue">
   Residente:
   {% if residente %}<strong>{{ residente.nombres }} {{ residente.apellidos }}</strong> ({{ residente.codigo }})
@@ -12,6 +13,10 @@
 </p>
 <p class="aviso">Borrador generado por IA: revisa cada dato con su fragmento de origen. No es una
 atención registrada.</p>
+{% if marcado_sin_actividad %}
+<p class="aviso">No cambia desde el {{ borrador.actualizado_en | hora_chile }}, hace más de
+{{ dias_sin_actividad }} días: revísalo y complétalo o descártalo.</p>
+{% endif %}
 
 {% if borrador.faltantes %}
 <section class="tarjeta">

@@ -58,6 +58,17 @@ def test_en_render_la_direccion_publica_se_toma_sola(monkeypatch):
     assert Config(_env_file=None).public_base_url == "https://pds3-grupo2.onrender.com"
 
 
+def test_los_dias_sin_actividad_de_un_borrador_se_pueden_configurar(monkeypatch):
+    monkeypatch.delenv("DIAS_SIN_ACTIVIDAD_BORRADOR", raising=False)
+    assert Config(_env_file=None).dias_sin_actividad_borrador == 30
+
+    monkeypatch.setenv("DIAS_SIN_ACTIVIDAD_BORRADOR", "7")
+    assert Config(_env_file=None).dias_sin_actividad_borrador == 7
+
+    with pytest.raises(ValidationError):
+        Config(_env_file=None, dias_sin_actividad_borrador=0)
+
+
 def test_el_token_no_aparece_al_imprimir_la_configuracion():
     config = Config(_env_file=None, telegram_mode="polling", telegram_bot_token="123:secreto")
 

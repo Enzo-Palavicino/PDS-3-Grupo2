@@ -2,6 +2,7 @@ import logging
 import time
 from datetime import timedelta
 
+from app.canales.base import ErrorDeCanal
 from app.db import ahora
 from app.modelos import EstadoMensaje, EventoAuditoria, MensajeEntrante, TipoActor
 from app.nucleo import textos
@@ -76,6 +77,23 @@ def test_despues_de_3_fallos_queda_en_error_y_se_avisa_una_sola_vez(
     assert final.intentos == MAXIMO_INTENTOS
     assert final.proximo_intento_en is None
     assert canal_falso.enviados == [("55667788", textos.ERROR, "55667788:412")]
+
+
+def test_si_el_canal_pide_esperar_el_reintento_espera_al_menos_eso(
+    fabrica_de_sesiones, contexto, guardar_mensaje, canal_falso
+):
+    # Por ejemplo, Telegram responde 429 con retry_after cuando se supera su límite de mensajes.
+    canal_falso.envios_que_fallan = 1
+    canal_falso.error_de_envio = ErrorDeCanal("límite de mensajes", reintentar_en=120)
+    mensaje = guardar_mensaje()
+
+    Worker(fabrica_de_sesiones, contexto).procesar_pendientes()
+
+    fallido = leer(fabrica_de_sesiones, mensaje.id)
+    assert fallido.estado == EstadoMensaje.EXTRAIDO
+    assert fallido.ultimo_error == "ErrorDeCanal"
+    # Tras el primer fallo se esperarían 10 s, pero el canal pidió 120.
+    assert fallido.proximo_intento_en > ahora() + timedelta(seconds=110)
 
 
 def test_si_falla_el_envio_de_la_respuesta_el_reintento_no_vuelve_a_llamar_a_la_ia(

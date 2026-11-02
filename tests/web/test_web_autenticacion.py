@@ -40,6 +40,13 @@ def test_despues_de_entrar_vuelve_a_la_pagina_pedida(entrar):
     assert entrar("pediatra", siguiente="/borradores/7").headers["location"] == "/borradores/7"
 
 
+def test_si_la_pagina_pedida_es_de_otro_rol_va_a_su_pagina_de_inicio(entrar):
+    # Por ejemplo, el enlace de un borrador que envió el bot, abierto por la directora: esa
+    # página le respondería 403.
+    assert entrar("directora", siguiente="/borradores/7").headers["location"] == "/vinculos"
+    assert entrar("pediatra", siguiente="/vinculos").headers["location"] == "/borradores"
+
+
 def test_nunca_redirige_a_otro_sitio(entrar):
     for externo in ["https://sitio-falso.example", "//sitio-falso.example"]:
         assert entrar("pediatra", siguiente=externo).headers["location"] == "/borradores"

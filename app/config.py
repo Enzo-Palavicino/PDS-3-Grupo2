@@ -44,6 +44,9 @@ class Config(BaseSettings):
     # Firma la cookie de sesión de la web. Si no se define, se genera una al azar al arrancar, y
     # las sesiones se cierran cada vez que se reinicia la aplicación.
     secret_key: SecretStr | None = None
+    # Un borrador pendiente que no cambia en estos días aparece marcado "sin actividad" en la
+    # web, para que alguien lo revise (regla 9 de la especificación). Nunca se borra solo.
+    dias_sin_actividad_borrador: int = Field(30, ge=1)
 
     # Por defecto, un archivo SQLite en data/ (ignorada por git). En el servidor, PostgreSQL.
     database_url: str = "sqlite:///./data/app.db"

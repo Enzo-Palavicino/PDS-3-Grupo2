@@ -1,6 +1,7 @@
 """Borradores: la encargada de salud ve todos; cada profesional, solo los suyos.
 
-Cada vez que alguien abre un borrador queda un evento de auditoría de lectura.
+Cada vez que alguien abre un borrador queda un evento de auditoría de lectura. Los pendientes
+que no cambian hace más de DIAS_SIN_ACTIVIDAD_BORRADOR días aparecen marcados "sin actividad".
 """
 
 from typing import Annotated, Any
@@ -24,6 +25,7 @@ from app.modelos import (
     UsuarioWeb,
 )
 from app.nucleo.auditoria import Accion, registrar_evento
+from app.nucleo.borradores import sin_actividad
 from app.web.autenticacion import SesionBD, exigir_rol, verificar_csrf
 from app.web.plantillas import pagina
 
@@ -62,7 +64,16 @@ def lista_de_borradores(request: Request, sesion: SesionBD, usuario: LectorDeBor
     )
     if usuario.rol == Rol.PROFESIONAL:
         consulta = consulta.where(BorradorAtencion.profesional_id == usuario.profesional_id)
-    return pagina(request, "borradores.html", usuario=usuario, filas=sesion.execute(consulta).all())
+    filas = sesion.execute(consulta).all()
+    dias = _dias_sin_actividad(request)
+    return pagina(
+        request,
+        "borradores.html",
+        usuario=usuario,
+        filas=filas,
+        ids_sin_actividad={borrador.id for borrador, _, _ in filas if sin_actividad(borrador, dias)},
+        dias_sin_actividad=dias,
+    )
 
 
 @router.get("/borradores/{borrador_id}")
@@ -92,11 +103,14 @@ def detalle_de_borrador(
         entidad_id=borrador.id,
     )
     sesion.commit()
+    dias = _dias_sin_actividad(request)
     return pagina(
         request,
         "borrador.html",
         usuario=usuario,
         borrador=borrador,
+        marcado_sin_actividad=sin_actividad(borrador, dias),
+        dias_sin_actividad=dias,
         profesional=sesion.get(Profesional, borrador.profesional_id),
         residente=sesion.get(Residente, borrador.residente_id) if borrador.residente_id else None,
         campos=filas_de_campos(borrador.campos),
@@ -123,6 +137,10 @@ def descartar_borrador(borrador_id: int, sesion: SesionBD, usuario: LectorDeBorr
     )
     sesion.commit()
     return RedirectResponse(f"/borradores/{borrador.id}", status_code=303)
+
+
+def _dias_sin_actividad(request: Request) -> int:
+    return request.app.state.config.dias_sin_actividad_borrador
 
 
 def _borrador_visible(sesion: Session, borrador_id: int, usuario: UsuarioWeb) -> BorradorAtencion:

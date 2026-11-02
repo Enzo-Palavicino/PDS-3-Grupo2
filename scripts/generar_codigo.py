@@ -3,8 +3,8 @@
 Uso:  python -m scripts.generar_codigo <usuario web del profesional>
       python -m scripts.generar_codigo pediatra
 
-Sirve mientras no exista la vista web de vínculos, donde la directora generará los enlaces.
-El enlace es de un solo uso y vence en 10 minutos.
+Es una alternativa a la página /vinculos de la plataforma, donde la directora genera los
+enlaces con su código QR. El enlace es de un solo uso y vence en 10 minutos.
 """
 
 import sys

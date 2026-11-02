@@ -13,6 +13,7 @@ from typing import Any
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.canales.base import AdaptadorCanal, Ignorado, MensajeNormalizado
+from app.logs import trazas_habilitadas
 from app.modelos import TipoActor
 from app.nucleo import textos
 from app.nucleo.auditoria import Accion, registrar_evento
@@ -42,8 +43,18 @@ def ingerir(
 
 
 def enviar_respuestas(adaptador: AdaptadorCanal, respuestas: list[Respuesta]) -> None:
+    """Envía las respuestas inmediatas, como "Recibido". Si una falla (por ejemplo, porque el
+    canal no responde), se registra y se sigue: el mensaje ya quedó guardado y el worker lo
+    procesa igual."""
     for respuesta in respuestas:
-        adaptador.enviar_texto(respuesta.destino, respuesta.texto, respuesta.responder_a)
+        try:
+            adaptador.enviar_texto(respuesta.destino, respuesta.texto, respuesta.responder_a)
+        except Exception as error:
+            logger.warning(
+                "No se pudo enviar una respuesta al chat (%s)",
+                type(error).__name__,
+                exc_info=trazas_habilitadas(),
+            )
 
 
 def procesar_mensaje(sesion: Session, mensaje: MensajeNormalizado | Ignorado) -> list[Respuesta]:

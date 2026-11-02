@@ -3,6 +3,7 @@ import json
 import httpx2
 import pytest
 
+from app.canales.base import ErrorDeCanal
 from app.canales.telegram.cliente import ErrorTelegram
 
 
@@ -75,6 +76,8 @@ def test_limite_de_mensajes_indica_cuanto_esperar(cliente_falso):
 
     assert error.value.codigo == 429
     assert error.value.reintentar_en == 5
+    # Es un error de canal: el worker respeta la espera sin saber que viene de Telegram.
+    assert isinstance(error.value, ErrorDeCanal)
 
 
 def test_error_de_red_no_expone_el_token(cliente_falso, token_bot):

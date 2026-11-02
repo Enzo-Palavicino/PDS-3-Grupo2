@@ -15,7 +15,6 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 
 from app.canales.base import AdaptadorCanal
-from app.logs import trazas_habilitadas
 from app.nucleo.ingesta import Respuesta, enviar_respuestas, ingerir
 from app.nucleo.worker import Worker
 
@@ -51,12 +50,5 @@ async def recibir_update(request: Request, tareas: BackgroundTasks) -> dict[str,
 def _despues_de_responder(
     adaptador: AdaptadorCanal, respuestas: list[Respuesta], worker: Worker
 ) -> None:
-    try:
-        enviar_respuestas(adaptador, respuestas)
-    except Exception as error:
-        logger.warning(
-            "No se pudieron enviar las respuestas al chat (%s)",
-            type(error).__name__,
-            exc_info=trazas_habilitadas(),
-        )
+    enviar_respuestas(adaptador, respuestas)  # si una falla, se registra y se sigue
     worker.despertar()  # si se guardó un mensaje, se procesa en segundo plano
