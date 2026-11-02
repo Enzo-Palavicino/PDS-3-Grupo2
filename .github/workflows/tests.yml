@@ -33,3 +33,39 @@ jobs:
 
       - name: Tests (pytest)
         run: pytest
+
+  # Las mismas migraciones contra un PostgreSQL real, como el del servidor: revisa lo que cambia
+  # respecto de SQLite (el trigger de auditoría, los SAVEPOINT y el índice único parcial).
+  postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          # Credenciales de un contenedor desechable del CI, no de un servidor real.
+          POSTGRES_USER: pds3
+          POSTGRES_PASSWORD: pds3
+          POSTGRES_DB: pds3
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_POSTGRES_URL: postgresql://pds3:pds3@localhost:5432/pds3
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+
+      - name: Instalar dependencias
+        run: pip install -r requirements-dev.txt
+
+      - name: Tests con PostgreSQL (pytest)
+        run: pytest tests/test_postgres.py

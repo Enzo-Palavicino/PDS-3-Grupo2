@@ -42,6 +42,18 @@ class ClienteBotTelegram:
         """getMe: datos del bot, como su nombre de usuario."""
         return self._llamar("getMe")
 
+    def configurar_webhook(self, url: str, secreto: str, tipos: list[str]) -> None:
+        """setWebhook: Telegram enviará cada update a url, con el secreto en un encabezado."""
+        self._llamar("setWebhook", url=url, secret_token=secreto, allowed_updates=tipos)
+
+    def borrar_webhook(self) -> None:
+        """deleteWebhook: el bot vuelve a quedar disponible para getUpdates (polling)."""
+        self._llamar("deleteWebhook")
+
+    def info_webhook(self) -> dict[str, Any]:
+        """getWebhookInfo: URL configurada, updates pendientes y último error."""
+        return self._llamar("getWebhookInfo")
+
     def obtener_actualizaciones(
         self, offset: int | None, tipos: list[str] | None = None
     ) -> list[dict[str, Any]]:

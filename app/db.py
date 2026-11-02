@@ -63,8 +63,18 @@ def ahora() -> datetime:
     return datetime.now(UTC)
 
 
+def normalizar_url(url: str) -> str:
+    """Render entrega la URL de PostgreSQL como postgres:// o postgresql://. SQLAlchemy necesita
+    que indique también el driver: postgresql+psycopg://."""
+    for prefijo in ("postgres://", "postgresql://"):
+        if url.startswith(prefijo):
+            return "postgresql+psycopg://" + url.removeprefix(prefijo)
+    return url
+
+
 def crear_motor(url: str) -> Engine:
     """Crea el motor de conexión a la base de datos de la URL."""
+    url = normalizar_url(url)
     url_bd = make_url(url)
     if url_bd.get_backend_name() != "sqlite":
         # pool_pre_ping: revisa que la conexión siga viva antes de usarla.
@@ -95,12 +105,22 @@ def _configurar_conexion_sqlite(conexion_dbapi, _registro) -> None:
 
 
 def _iniciar_transaccion_sqlite(conexion: Connection) -> None:
-    conexion.exec_driver_sql("BEGIN")
+    # IMMEDIATE: la transacción toma el permiso de escritura al empezar. Si otra está escribiendo,
+    # espera (busy_timeout) en vez de fallar a la mitad con "database is locked". Por eso las
+    # transacciones tienen que ser cortas: ver cerrar_transaccion().
+    conexion.exec_driver_sql("BEGIN IMMEDIATE")
 
 
 def crear_fabrica_de_sesiones(motor: Engine) -> sessionmaker[Session]:
     # expire_on_commit=False: los objetos siguen legibles después del commit, sin volver a la BD.
     return sessionmaker(bind=motor, expire_on_commit=False)
+
+
+def cerrar_transaccion(sesion: Session) -> None:
+    """Cierra la transacción antes de llamar a un servicio externo (Telegram, OpenAI), que puede
+    tardar varios segundos. Así la base de datos no queda tomada mientras tanto, y la recepción
+    de mensajes y la web pueden seguir escribiendo. Los objetos ya leídos siguen disponibles."""
+    sesion.commit()
 
 
 def esquema_creado(motor: Engine) -> bool:

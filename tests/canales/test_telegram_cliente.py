@@ -27,6 +27,21 @@ def test_no_envia_parametros_vacios(cliente_falso):
     assert json.loads(peticiones[0].content) == {"timeout": 30, "allowed_updates": ["message"]}
 
 
+def test_configurar_el_webhook_envia_la_url_y_el_secreto(cliente_falso):
+    cliente, peticiones = cliente_falso(
+        lambda peticion: httpx2.Response(200, json={"ok": True, "result": True})
+    )
+
+    cliente.configurar_webhook("https://pds3.example/webhooks/telegram", "secreto", ["message"])
+
+    assert peticiones[0].url.path.endswith("/setWebhook")
+    assert json.loads(peticiones[0].content) == {
+        "url": "https://pds3.example/webhooks/telegram",
+        "secret_token": "secreto",
+        "allowed_updates": ["message"],
+    }
+
+
 def test_error_de_telegram_trae_la_descripcion_pero_no_el_token(cliente_falso, token_bot):
     cliente, _ = cliente_falso(
         lambda peticion: httpx2.Response(

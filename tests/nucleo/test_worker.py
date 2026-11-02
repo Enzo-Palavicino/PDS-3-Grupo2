@@ -3,9 +3,10 @@ import time
 from datetime import timedelta
 
 from app.db import ahora
-from app.modelos import EstadoMensaje, MensajeEntrante
+from app.modelos import EstadoMensaje, EventoAuditoria, MensajeEntrante, TipoActor
 from app.nucleo import textos
 from app.nucleo.worker import MAXIMO_INTENTOS, Worker
+from app.proveedores.llm.base import ProveedorLLM, ResultadoLLM
 
 
 def leer(fabrica_de_sesiones, mensaje_id: int) -> MensajeEntrante:
@@ -93,6 +94,36 @@ def test_si_falla_el_envio_de_la_respuesta_el_reintento_no_vuelve_a_llamar_a_la_
     assert leer(fabrica_de_sesiones, mensaje.id).estado == EstadoMensaje.LISTO
     assert len(contexto.llm.entradas) == 1  # la IA se llamó una sola vez
     assert len(canal_falso.enviados) == 1
+
+
+class LLMQueEsperaMientrasOtrosEscriben(ProveedorLLM):
+    """Mientras la IA "piensa", otra parte de la aplicación escribe en la base de datos (por
+    ejemplo, la web guarda un evento de auditoría)."""
+
+    nombre = "fake"
+
+    def __init__(self, fabrica_de_sesiones):
+        self._fabrica = fabrica_de_sesiones
+
+    def generar_json(self, instrucciones, entrada, esquema):
+        with self._fabrica.begin() as otra_sesion:
+            otra_sesion.add(EventoAuditoria(actor_tipo=TipoActor.SISTEMA, accion="prueba"))
+        return ResultadoLLM(texto="{}", modelo="fake")
+
+
+def test_mientras_la_ia_responde_los_demas_pueden_escribir(
+    fabrica_de_sesiones, contexto, guardar_mensaje
+):
+    # Si el worker dejara su transacción abierta durante la llamada a la IA, en SQLite la otra
+    # escritura quedaría bloqueada y el intento fallaría con "database is locked".
+    contexto.llm = LLMQueEsperaMientrasOtrosEscriben(fabrica_de_sesiones)
+    mensaje = guardar_mensaje()
+
+    Worker(fabrica_de_sesiones, contexto).procesar_pendientes()
+
+    procesado = leer(fabrica_de_sesiones, mensaje.id)
+    assert procesado.estado == EstadoMensaje.LISTO
+    assert procesado.intentos == 0
 
 
 def test_el_log_de_un_fallo_no_incluye_su_contenido(

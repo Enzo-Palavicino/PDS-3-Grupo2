@@ -9,12 +9,14 @@ from typing import Any
 from urllib.parse import quote
 
 from fastapi import FastAPI, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import RedirectResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
+from app.canales.telegram import webhook as webhook_telegram
 from app.canales.telegram.adaptador import AdaptadorTelegram
-from app.canales.telegram.cliente import ClienteBotTelegram
+from app.canales.telegram.cliente import ClienteBotTelegram, ErrorTelegram
 from app.canales.telegram.polling import PollingTelegram
 from app.config import Config, obtener_config
 from app.db import crear_fabrica_de_sesiones, crear_motor, esquema_creado
@@ -49,14 +51,19 @@ def crear_app(config: Config | None = None) -> FastAPI:
         cliente = None
         if config.telegram_bot_token:
             cliente = ClienteBotTelegram(config.telegram_bot_token.get_secret_value())
-        # Lo que usan las páginas web.
+        # Lo que usan las rutas web y el webhook.
         aplicacion.state.fabrica_de_sesiones = fabrica_de_sesiones
         aplicacion.state.cliente_telegram = cliente
         aplicacion.state.usuario_bot = None
+        aplicacion.state.webhook_telegram = None
+        aplicacion.state.worker = None
 
         polling = worker = None
-        if config.telegram_mode == "polling":
-            adaptador = AdaptadorTelegram(cliente)
+        if config.telegram_mode != "off":
+            secreto = config.telegram_webhook_secret
+            adaptador = AdaptadorTelegram(
+                cliente, secreto_webhook=secreto.get_secret_value() if secreto else None
+            )
             contexto = Contexto(
                 adaptadores={"telegram": adaptador},
                 stt=crear_proveedor_stt(config),
@@ -66,14 +73,21 @@ def crear_app(config: Config | None = None) -> FastAPI:
                 borrar_mensajes_importados=config.telegram_delete_incoming,
             )
             worker = Worker(fabrica_de_sesiones, contexto)
-
-            def manejar_update(update: dict[str, Any]) -> None:
-                enviar_respuestas(adaptador, ingerir(fabrica_de_sesiones, adaptador, update))
-                worker.despertar()  # si se guardó un mensaje, se procesa en segundo plano
-
-            polling = PollingTelegram(cliente, manejar_update)
+            aplicacion.state.worker = worker
             worker.iniciar()
-            polling.iniciar()
+
+            if config.telegram_mode == "polling":
+
+                def manejar_update(update: dict[str, Any]) -> None:
+                    enviar_respuestas(adaptador, ingerir(fabrica_de_sesiones, adaptador, update))
+                    worker.despertar()  # si se guardó un mensaje, se procesa en segundo plano
+
+                polling = PollingTelegram(cliente, manejar_update)
+                polling.iniciar()
+            else:
+                # Se le indica a Telegram a dónde enviar los mensajes, en cada arranque.
+                await run_in_threadpool(_configurar_webhook, cliente, config)
+                aplicacion.state.webhook_telegram = adaptador
         yield
         if polling:
             polling.detener()
@@ -81,18 +95,27 @@ def crear_app(config: Config | None = None) -> FastAPI:
             worker.detener()
         motor.dispose()
 
-    app = FastAPI(title="Plataforma de salud del Hogar Misión de María", lifespan=ciclo_de_vida)
+    # Con HTTPS, la aplicación está en el servidor público.
+    en_servidor = config.public_base_url.startswith("https://")
+    app = FastAPI(
+        title="Plataforma de salud del Hogar Misión de María",
+        lifespan=ciclo_de_vida,
+        # En el servidor no se publica la documentación automática de la API (/docs).
+        docs_url=None if en_servidor else "/docs",
+        redoc_url=None if en_servidor else "/redoc",
+        openapi_url=None if en_servidor else "/openapi.json",
+    )
     app.add_middleware(
         SessionMiddleware,
         secret_key=_clave_de_sesion(config),
         max_age=8 * 60 * 60,  # la sesión dura 8 horas
         same_site="lax",
-        # Con HTTPS (en el servidor), la cookie solo viaja cifrada.
-        https_only=config.public_base_url.startswith("https://"),
+        https_only=en_servidor,  # con HTTPS, la cookie de sesión solo viaja cifrada
     )
     app.include_router(autenticacion.router)
     app.include_router(vinculos.router)
     app.include_router(borradores.router)
+    app.include_router(webhook_telegram.router)
 
     @app.exception_handler(SesionRequerida)
     async def ir_al_inicio_de_sesion(request: Request, error: SesionRequerida):
@@ -118,6 +141,18 @@ def crear_app(config: Config | None = None) -> FastAPI:
         return {"estado": "ok"}
 
     return app
+
+
+def _configurar_webhook(cliente: ClienteBotTelegram, config: Config) -> None:
+    url = f"{config.public_base_url.rstrip('/')}{webhook_telegram.RUTA}"
+    try:
+        cliente.configurar_webhook(
+            url, config.telegram_webhook_secret.get_secret_value(), tipos=["message"]
+        )
+    except ErrorTelegram as error:
+        logger.error("No se pudo configurar el webhook de Telegram: %s", error)
+        return
+    logger.info("Webhook de Telegram configurado en %s", url)
 
 
 def _clave_de_sesion(config: Config) -> str:

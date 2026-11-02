@@ -25,6 +25,39 @@ def test_extraer_con_openai_exige_su_api_key(monkeypatch):
         Config(_env_file=None, llm_provider="openai")
 
 
+WEBHOOK = {
+    "telegram_mode": "webhook",
+    "telegram_bot_token": "123:abc",
+    "public_base_url": "https://pds3.example",
+}
+
+
+def test_el_webhook_exige_un_secreto_valido():
+    with pytest.raises(ValidationError, match="requiere TELEGRAM_WEBHOOK_SECRET"):
+        Config(_env_file=None, **WEBHOOK)
+    # Telegram no acepta caracteres como "+" o "/" en el secreto.
+    with pytest.raises(ValidationError, match="requiere TELEGRAM_WEBHOOK_SECRET"):
+        Config(_env_file=None, telegram_webhook_secret="con+signos/raros", **WEBHOOK)
+
+    assert Config(_env_file=None, telegram_webhook_secret="Secreto_valido-123", **WEBHOOK)
+
+
+def test_el_webhook_exige_https():
+    with pytest.raises(ValidationError, match="PUBLIC_BASE_URL con https"):
+        Config(
+            _env_file=None,
+            **(WEBHOOK | {"public_base_url": "http://pds3.example"}),
+            telegram_webhook_secret="secreto",
+        )
+
+
+def test_en_render_la_direccion_publica_se_toma_sola(monkeypatch):
+    monkeypatch.delenv("PUBLIC_BASE_URL", raising=False)
+    monkeypatch.setenv("RENDER_EXTERNAL_URL", "https://pds3-grupo2.onrender.com")
+
+    assert Config(_env_file=None).public_base_url == "https://pds3-grupo2.onrender.com"
+
+
 def test_el_token_no_aparece_al_imprimir_la_configuracion():
     config = Config(_env_file=None, telegram_mode="polling", telegram_bot_token="123:secreto")
 

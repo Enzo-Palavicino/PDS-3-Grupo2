@@ -1,0 +1,47 @@
+# Despliegue en Render (https://render.com): un servicio web y una base de datos PostgreSQL, en
+# el plan gratuito. Los secretos (sync: false) se ingresan en el panel de Render al crear el
+# servicio: nunca se escriben aquí, porque el repositorio es público.
+services:
+  - type: web
+    name: pds3-grupo2
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    # Antes de arrancar se aplican las migraciones y se cargan los datos de demostración (el
+    # script no duplica nada si ya existen).
+    startCommand: alembic upgrade head && python -m scripts.sembrar_datos && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.13"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: pds3-grupo2-bd
+          property: connectionString
+      # La dirección pública (https://...onrender.com) la entrega Render en RENDER_EXTERNAL_URL.
+      - key: TELEGRAM_MODE
+        value: webhook
+      - key: TELEGRAM_DELETE_INCOMING
+        value: "true"
+      - key: STT_PROVIDER
+        value: openai
+      - key: LLM_PROVIDER
+        value: openai
+      - key: SECRET_KEY
+        generateValue: true
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      # Solo letras, números, _ y -. Genérala con:
+      #   python -c "import secrets; print(secrets.token_urlsafe(32))"
+      - key: TELEGRAM_WEBHOOK_SECRET
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: SEED_PASSWORD
+        sync: false
+
+databases:
+  - name: pds3-grupo2-bd
+    plan: free
+    databaseName: pds3
+    user: pds3

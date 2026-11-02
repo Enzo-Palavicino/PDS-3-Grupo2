@@ -137,6 +137,24 @@ Desde ese momento, cada texto o audio que envíes queda guardado para procesarse
 responde "Recibido". Una cuenta sin vincular recibe "Esta cuenta no está autorizada para enviar
 registros", y su mensaje no se guarda.
 
+### Webhook (en el servidor)
+
+En el servidor, con `TELEGRAM_MODE=webhook`, Telegram le envía cada mensaje a la aplicación en un
+POST a `/webhooks/telegram`. La aplicación configura el webhook sola al arrancar (con
+`PUBLIC_BASE_URL`, que tiene que usar https) y solo acepta las peticiones que traen el secreto de
+`TELEGRAM_WEBHOOK_SECRET` en el encabezado `X-Telegram-Bot-Api-Secret-Token`: cualquier otra
+recibe 401 y no se guarda. La ruta responde apenas guarda el mensaje; las respuestas al chat se
+envían después, y el worker hace el resto en segundo plano.
+
+```bash
+python -m scripts.telegram_webhook info     # URL configurada, pendientes y último error
+python -m scripts.telegram_webhook delete   # borra el webhook: el bot vuelve al polling
+python -m scripts.telegram_webhook set      # lo configura a mano (normalmente no hace falta)
+```
+
+Un bot con webhook activo no funciona en modo polling (Telegram responde 409). Por eso conviene
+un bot para el servidor y otro para desarrollar en local.
+
 ## Procesamiento de los mensajes
 
 Cada mensaje que el bot guarda lo procesa en segundo plano un worker: un hilo dentro de la misma
@@ -265,6 +283,33 @@ en el servidor.
   se cierran al reiniciar la aplicación.
 - Los enlaces que envía el bot llevan directo al borrador, después de iniciar sesión.
 
+## Despliegue en Render
+
+El servidor público (HTTPS, necesario para los webhooks de Telegram y WhatsApp) corre en el plan
+gratuito de [Render](https://render.com), con PostgreSQL. Todo lo que necesita está descrito en
+`render.yaml`.
+
+1. Crea una cuenta en Render. Como el repositorio es público, no hace falta conectar GitHub.
+2. En el panel, elige **New → Blueprint**, pega la URL del repositorio y elige la rama. Render
+   lee `render.yaml` y crea el servicio web y la base de datos.
+3. Completa los secretos que pide:
+   - `TELEGRAM_BOT_TOKEN`: el token de un bot para el servidor, distinto del que usas en local;
+   - `TELEGRAM_WEBHOOK_SECRET`: genéralo con
+     `python -c "import secrets; print(secrets.token_urlsafe(32))"`;
+   - `OPENAI_API_KEY`: la key del curso;
+   - `SEED_PASSWORD`: la contraseña de los usuarios de demostración.
+4. Render instala las dependencias y, en cada arranque, aplica las migraciones, carga los datos
+   de demostración (sin duplicarlos) y levanta la aplicación, que configura el webhook. La
+   dirección pública la toma sola de `RENDER_EXTERNAL_URL`.
+5. Revisa que `https://<tu-servicio>.onrender.com/health` responda `{"estado":"ok"}`. Después
+   entra como `directora`, genera un enlace en Vínculos y vincula la cuenta de Telegram.
+
+Cada push a la rama elegida vuelve a desplegar. En el plan gratuito el servicio se duerme tras
+un rato sin uso, y la primera petición tarda cerca de un minuto en despertarlo: antes de una
+demo, abre `/health`. Los mensajes que lleguen mientras despierta no se pierden, porque Telegram
+reintenta y la cola de mensajes está en la base de datos. La base de datos gratuita también
+tiene fecha de vencimiento; Render la muestra en su panel.
+
 ## Tests y lint
 
 ```bash
@@ -275,6 +320,11 @@ ruff check .
 `pytest` corre los tests automáticos, y `ruff` revisa errores comunes (por ejemplo, imports o
 variables sin usar) y el orden de los imports. GitHub Actions corre ambos en cada push: el
 resultado se ve en la pestaña Actions y en el PR. Los tests no usan servicios externos.
+
+Los tests de `tests/test_postgres.py` corren solo si `TEST_POSTGRES_URL` apunta a un
+PostgreSQL. En GitHub Actions corren en un job aparte, con un PostgreSQL en un contenedor:
+revisan lo que cambia respecto de SQLite (el trigger de auditoría, los SAVEPOINT y el índice
+único parcial).
 
 ## Estructura
 

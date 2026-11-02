@@ -40,10 +40,12 @@ class Worker:
         self._intervalo_seg = intervalo_seg
         self._hay_trabajo = threading.Event()
         self._detenido = threading.Event()
+        self._hilo: threading.Thread | None = None
 
     def iniciar(self) -> None:
         # daemon: el hilo no impide que el proceso termine.
-        threading.Thread(target=self.ejecutar, name="worker-mensajes", daemon=True).start()
+        self._hilo = threading.Thread(target=self.ejecutar, name="worker-mensajes", daemon=True)
+        self._hilo.start()
 
     def despertar(self) -> None:
         """Avisa que llegó un mensaje, para procesarlo sin esperar a la próxima revisión."""
@@ -52,6 +54,10 @@ class Worker:
     def detener(self) -> None:
         self._detenido.set()
         self._hay_trabajo.set()
+        if self._hilo is not None:
+            # Da unos segundos para terminar el mensaje en curso; lo que quede pendiente se
+            # retoma al volver a arrancar.
+            self._hilo.join(timeout=5)
 
     def ejecutar(self) -> None:
         """Procesa la cola hasta que se llame a detener()."""

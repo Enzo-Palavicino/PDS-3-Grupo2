@@ -11,6 +11,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.db import cerrar_transaccion
 from app.modelos import (
     BorradorAtencion,
     BorradorMensaje,
@@ -50,6 +51,8 @@ def armar_borrador(
     texto_nuevo = texto_del_mensaje(sesion, mensaje)
     profesional = sesion.get(Profesional, mensaje.profesional_id)
     residentes = list(sesion.scalars(select(Residente).order_by(Residente.codigo)))
+    # La IA tarda varios segundos: la transacción se cierra antes de llamarla.
+    cerrar_transaccion(sesion)
     resultado = extraer_registro(
         "\n".join([*textos_previos, texto_nuevo]),
         residentes,

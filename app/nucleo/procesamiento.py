@@ -16,6 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.canales.base import AdaptadorCanal
+from app.db import cerrar_transaccion
 from app.logs import trazas_habilitadas
 from app.modelos import EstadoMensaje, MensajeEntrante, Residente, Transcripcion
 from app.nucleo import textos
@@ -68,6 +69,8 @@ def procesar(sesion: Session, mensaje: MensajeEntrante, contexto: Contexto) -> N
     if mensaje.estado not in ESTADOS_PENDIENTES:
         return
     adaptador = contexto.adaptadores[mensaje.canal]
+    # Cada paso cierra su transacción antes de llamar a Telegram u OpenAI (ver cerrar_transaccion).
+    cerrar_transaccion(sesion)
     _indicar_procesando(adaptador, mensaje)
 
     if mensaje.estado in (EstadoMensaje.RECIBIDO, EstadoMensaje.DESCARGADO):
@@ -113,6 +116,7 @@ def _transcribir(
     if ya_transcrito is not None:
         return
 
+    cerrar_transaccion(sesion)
     contenido, mime_descargado = adaptador.descargar_audio(mensaje.audio_ref)
     mime = mensaje.audio_mime or mime_descargado
     # mode=0o700: en Linux, solo el usuario de la aplicación puede entrar a la carpeta.
@@ -146,6 +150,7 @@ def _responder(
     # Si el borrador ya tiene un mensaje del bot, lo que falta ya se pidió una vez.
     ya_se_pidio = borrador.mensaje_bot_id_externo is not None
     texto = texto_de_respuesta(borrador, residente, ya_se_pidio, contexto.url_publica)
+    cerrar_transaccion(sesion)
     # Se guarda el id del mensaje del bot: si el profesional le responde, completa este borrador.
     borrador.mensaje_bot_id_externo = adaptador.enviar_texto(
         mensaje.destino_respuesta, texto, mensaje.id_externo

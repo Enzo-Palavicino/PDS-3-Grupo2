@@ -60,9 +60,13 @@ def id_profesional(sesion, datos_demo):
     """Id del profesional de un usuario web de la demo (por ejemplo, "pediatra")."""
 
     def buscar(usuario: str) -> int:
-        return sesion.scalar(
+        profesional_id = sesion.scalar(
             select(UsuarioWeb.profesional_id).where(UsuarioWeb.usuario == usuario)
         )
+        # Cierra la transacción de lectura: en SQLite tomaría el permiso de escritura y la
+        # aplicación no podría escribir mientras tanto.
+        sesion.commit()
+        return profesional_id
 
     return buscar
 
@@ -99,6 +103,8 @@ def acciones(sesion):
 
     def leer() -> list[str]:
         sesion.commit()  # cierra la transacción anterior, para ver lo que escribió la aplicación
-        return list(sesion.scalars(select(EventoAuditoria.accion).order_by(EventoAuditoria.id)))
+        resultado = list(sesion.scalars(select(EventoAuditoria.accion).order_by(EventoAuditoria.id)))
+        sesion.commit()  # y la de esta lectura, para no bloquear a la aplicación
+        return resultado
 
     return leer
