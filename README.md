@@ -82,6 +82,24 @@ uvicorn es el servidor que ejecuta la aplicación: abre `http://localhost:8000` 
 petición a FastAPI. `--reload` la reinicia cada vez que cambia el código. Para comprobar que
 funciona, abre <http://localhost:8000/health>.
 
+## Base de datos
+
+En desarrollo se usa SQLite: un archivo en `data/app.db`, que git ignora. Las tablas se crean
+con migraciones de Alembic, que dejan registrado cada cambio del esquema.
+
+```bash
+alembic upgrade head              # crea o actualiza las tablas
+python -m scripts.sembrar_datos   # carga los datos ficticios de demostración
+```
+
+El script de datos necesita `SEED_PASSWORD` en `.env`: es la contraseña de los usuarios de
+demostración (`directora`, `encargada_salud`, `pediatra`, `nutricionista` y `kinesiologo`). Se
+puede correr varias veces sin duplicar nada.
+
+Si cambias un modelo en `app/modelos.py`, crea su migración con
+`alembic revision --autogenerate -m "descripción"` y revísala antes de hacer commit. Un test
+falla si los modelos y las migraciones no coinciden.
+
 ## Bot de Telegram
 
 ### Crear el bot
@@ -121,8 +139,14 @@ app/
   main.py         crea la aplicación, define GET /health y arranca la recepción de mensajes
   config.py       configuración leída desde variables de entorno o .env
   logs.py         configuración de los logs
+  db.py           conexión a la base de datos
+  modelos.py      tablas de la base de datos
+  seguridad.py    hash de contraseñas
   canales/
     base.py       tipos comunes a todos los canales: MensajeNormalizado y AdaptadorCanal
     telegram/     cliente de la Bot API, adaptador, polling y eco temporal
+  nucleo/         lógica que no depende del canal (por ahora, el registro de mensajes)
+migrations/       migraciones de Alembic
+scripts/          scripts de desarrollo, como la carga de datos de demostración
 tests/            tests automáticos
 ```

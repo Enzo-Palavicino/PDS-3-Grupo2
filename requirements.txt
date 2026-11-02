@@ -4,3 +4,6 @@ uvicorn[standard]==0.54.0
 pydantic-settings==2.16.2
 # Cliente HTTP para la Bot API de Telegram (también lo usa el TestClient de FastAPI).
 httpx2==2.16.0
+# Base de datos: SQLAlchemy (modelos y consultas) y Alembic (migraciones).
+sqlalchemy==2.1.6
+alembic==1.20.1

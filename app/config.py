@@ -21,6 +21,11 @@ class Config(BaseSettings):
     # off: no recibe mensajes (tests y CI). polling: desarrollo local con getUpdates.
     telegram_mode: Literal["off", "polling"] = "off"
 
+    # Por defecto, un archivo SQLite en data/ (ignorada por git). En el servidor, PostgreSQL.
+    database_url: str = "sqlite:///./data/app.db"
+    # Contraseña de los usuarios de demostración que crea scripts/sembrar_datos.py.
+    seed_password: SecretStr | None = None
+
     @model_validator(mode="after")
     def _exigir_token_de_telegram(self) -> "Config":
         if self.telegram_mode != "off" and not self.telegram_bot_token:

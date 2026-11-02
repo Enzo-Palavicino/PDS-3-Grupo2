@@ -12,3 +12,7 @@ target-version = "py311"
 [tool.ruff.lint]
 # Reglas por defecto (errores y código sin usar) más el orden de los imports.
 extend-select = ["I"]
+
+[tool.ruff.lint.per-file-ignores]
+# La plantilla de Alembic importa op y sa en todas las migraciones, aunque alguna no use ambos.
+"migrations/versions/*" = ["F401"]
