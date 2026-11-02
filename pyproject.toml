@@ -1,0 +1,14 @@
+# Configuración de las herramientas de desarrollo.
+# Las dependencias están en requirements.txt y requirements-dev.txt.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Permite que los tests importen el paquete "app" desde la raíz del repositorio.
+pythonpath = ["."]
+
+[tool.ruff]
+target-version = "py311"
+
+[tool.ruff.lint]
+# Reglas por defecto (errores y código sin usar) más el orden de los imports.
+extend-select = ["I"]

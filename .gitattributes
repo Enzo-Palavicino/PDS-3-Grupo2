@@ -1,0 +1,3 @@
+# Finales de línea LF en el repositorio y en las copias de trabajo,
+# para que Windows, macOS y Linux vean exactamente los mismos archivos.
+* text=auto eol=lf
