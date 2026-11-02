@@ -1,0 +1,11 @@
+{
+  "update_id": 900000006,
+  "message": {
+    "message_id": 416,
+    "from": {"id": 55667788, "is_bot": false, "first_name": "Prueba", "language_code": "es"},
+    "chat": {"id": 55667788, "first_name": "Prueba", "type": "private"},
+    "date": 1793634000,
+    "text": "/start Ab3dE_f-9XyZ",
+    "entities": [{"offset": 0, "length": 6, "type": "bot_command"}]
+  }
+}

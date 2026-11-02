@@ -14,3 +14,12 @@ def configurar_logs(nivel: str) -> None:
     # solo se registran advertencias y errores.
     for nombre in ("httpx2", "httpcore2", "httpx", "httpcore"):
         logging.getLogger(nombre).setLevel(logging.WARNING)
+
+
+def trazas_habilitadas() -> bool:
+    """Indica si se puede registrar la traza completa de un error (exc_info).
+
+    Una traza puede incluir datos de los mensajes, así que solo se registra con LOG_LEVEL=DEBUG,
+    que es para desarrollo con datos ficticios.
+    """
+    return logging.getLogger().isEnabledFor(logging.DEBUG)

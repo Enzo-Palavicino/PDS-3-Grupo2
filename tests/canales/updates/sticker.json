@@ -1,0 +1,20 @@
+{
+  "update_id": 900000004,
+  "message": {
+    "message_id": 415,
+    "from": {"id": 55667788, "is_bot": false, "first_name": "Prueba", "language_code": "es"},
+    "chat": {"id": 55667788, "first_name": "Prueba", "type": "private"},
+    "date": 1793634000,
+    "sticker": {
+      "width": 512,
+      "height": 512,
+      "emoji": "👍",
+      "is_animated": false,
+      "is_video": false,
+      "type": "regular",
+      "file_id": "CAACAgIAAxkBAAIBn2Voz-sticker-de-prueba",
+      "file_unique_id": "AgADsticker",
+      "file_size": 20000
+    }
+  }
+}

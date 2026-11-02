@@ -82,6 +82,27 @@ uvicorn es el servidor que ejecuta la aplicación: abre `http://localhost:8000` 
 petición a FastAPI. `--reload` la reinicia cada vez que cambia el código. Para comprobar que
 funciona, abre <http://localhost:8000/health>.
 
+## Bot de Telegram
+
+### Crear el bot
+
+1. En Telegram, abre @BotFather y envía `/newbot`. Elige un nombre y un usuario para el bot; el
+   usuario debe terminar en `bot`. BotFather responde con el token del bot.
+2. Envía `/setjoingroups`, elige tu bot y selecciona Disable, para que nadie pueda agregarlo a
+   un grupo. El bot solo atiende chats privados.
+3. Pon el token en tu `.env`, en `TELEGRAM_BOT_TOKEN`. Quien tenga el token controla el bot:
+   nunca lo subas al repositorio ni lo compartas.
+
+Conviene que cada integrante cree su propio bot para desarrollar. Con el mismo token no pueden
+funcionar dos instancias a la vez: Telegram corta una de ellas.
+
+### Probarlo en local (modo polling)
+
+Con `TELEGRAM_MODE=polling` en `.env`, la aplicación le pide a Telegram los mensajes nuevos con
+`getUpdates`, así que no necesita una URL pública. Levanta la aplicación con
+`uvicorn app.main:app --reload` y escríbele al bot. Por ahora responde un eco de lo que recibe,
+solo para probar la conexión.
+
 ## Tests y lint
 
 ```bash
@@ -97,8 +118,11 @@ resultado se ve en la pestaña Actions y en el PR. Los tests no usan servicios e
 
 ```
 app/
-  main.py     crea la aplicación y define GET /health
-  config.py   configuración leída desde variables de entorno o .env
-  logs.py     configuración de los logs
-tests/        tests automáticos
+  main.py         crea la aplicación, define GET /health y arranca la recepción de mensajes
+  config.py       configuración leída desde variables de entorno o .env
+  logs.py         configuración de los logs
+  canales/
+    base.py       tipos comunes a todos los canales: MensajeNormalizado y AdaptadorCanal
+    telegram/     cliente de la Bot API, adaptador, polling y eco temporal
+tests/            tests automáticos
 ```

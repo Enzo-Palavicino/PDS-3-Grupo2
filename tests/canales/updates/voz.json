@@ -1,0 +1,16 @@
+{
+  "update_id": 900000002,
+  "message": {
+    "message_id": 413,
+    "from": {"id": 55667788, "is_bot": false, "first_name": "Prueba", "language_code": "es"},
+    "chat": {"id": 55667788, "first_name": "Prueba", "type": "private"},
+    "date": 1793634000,
+    "voice": {
+      "duration": 7,
+      "mime_type": "audio/ogg",
+      "file_id": "AwACAgEAAxkBAAIBnWVoz-voz-de-prueba",
+      "file_unique_id": "AgADvoz",
+      "file_size": 28417
+    }
+  }
+}

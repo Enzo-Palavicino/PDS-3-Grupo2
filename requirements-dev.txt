@@ -1,6 +1,4 @@
 # Dependencias para desarrollo y tests (incluye las de la aplicación).
 -r requirements.txt
 pytest==9.2.0
-# Lo usa el TestClient de FastAPI.
-httpx2==2.16.0
 ruff==0.17.3
