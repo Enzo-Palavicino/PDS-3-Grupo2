@@ -6,15 +6,6 @@ from sqlalchemy.exc import DBAPIError, IntegrityError, StatementError
 
 from app.modelos import EventoAuditoria, Profesional, TipoActor, VinculoCanal
 
-
-@pytest.fixture
-def profesional(sesion) -> Profesional:
-    profesional = Profesional(nombre="Profesional de prueba", especialidad="pediatría")
-    sesion.add(profesional)
-    sesion.commit()
-    return profesional
-
-
 # Auditoría solo de inserción
 
 

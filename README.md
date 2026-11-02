@@ -118,8 +118,24 @@ funcionar dos instancias a la vez: Telegram corta una de ellas.
 
 Con `TELEGRAM_MODE=polling` en `.env`, la aplicación le pide a Telegram los mensajes nuevos con
 `getUpdates`, así que no necesita una URL pública. Levanta la aplicación con
-`uvicorn app.main:app --reload` y escríbele al bot. Por ahora responde un eco de lo que recibe,
-solo para probar la conexión.
+`uvicorn app.main:app --reload`. Para que el bot acepte tus mensajes, primero vincula tu cuenta.
+
+### Vincular tu cuenta
+
+El bot solo acepta registros de cuentas vinculadas a un profesional. Mientras no exista la vista
+web de vínculos, el enlace se genera desde la consola, con la base de datos creada y los datos
+de demostración cargados:
+
+```bash
+python -m scripts.generar_codigo pediatra
+```
+
+El script imprime un enlace `https://t.me/<tu_bot>?start=<código>`. Ábrelo en Telegram y pulsa
+Iniciar: el bot responde "Cuenta vinculada". El enlace es de un solo uso y vence en 10 minutos.
+
+Desde ese momento, cada texto o audio que envíes queda guardado para procesarse y el bot
+responde "Recibido". Una cuenta sin vincular recibe "Esta cuenta no está autorizada para enviar
+registros", y su mensaje no se guarda.
 
 ## Tests y lint
 
@@ -144,8 +160,8 @@ app/
   seguridad.py    hash de contraseñas
   canales/
     base.py       tipos comunes a todos los canales: MensajeNormalizado y AdaptadorCanal
-    telegram/     cliente de la Bot API, adaptador, polling y eco temporal
-  nucleo/         lógica que no depende del canal (por ahora, el registro de mensajes)
+    telegram/     cliente de la Bot API, adaptador y polling
+  nucleo/         lógica que no depende del canal: vinculación, ingesta de mensajes y auditoría
 migrations/       migraciones de Alembic
 scripts/          scripts de desarrollo, como la carga de datos de demostración
 tests/            tests automáticos

@@ -7,7 +7,15 @@ mismo código sirve para las dos: solo cambia DATABASE_URL.
 from datetime import UTC, datetime
 from pathlib import Path
 
-from sqlalchemy import Connection, DateTime, Engine, MetaData, create_engine, event
+from sqlalchemy import (
+    Connection,
+    DateTime,
+    Engine,
+    MetaData,
+    create_engine,
+    event,
+    inspect,
+)
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 from sqlalchemy.types import TypeDecorator
@@ -93,3 +101,8 @@ def _iniciar_transaccion_sqlite(conexion: Connection) -> None:
 def crear_fabrica_de_sesiones(motor: Engine) -> sessionmaker[Session]:
     # expire_on_commit=False: los objetos siguen legibles después del commit, sin volver a la BD.
     return sessionmaker(bind=motor, expire_on_commit=False)
+
+
+def esquema_creado(motor: Engine) -> bool:
+    """Indica si ya se corrieron las migraciones (alembic upgrade head)."""
+    return inspect(motor).has_table("alembic_version")
