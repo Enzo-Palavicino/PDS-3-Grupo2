@@ -97,6 +97,9 @@ class AdaptadorTelegram(AdaptadorCanal):
             raise
         return True
 
+    def indicar_procesando(self, destino: str) -> None:
+        self._cliente.enviar_accion(destino, "typing")
+
 
 def _id_mensaje(id_externo: str) -> int:
     """Extrae el message_id de un id externo con la forma "chat.id:message_id"."""

@@ -14,6 +14,9 @@ from app.config import Config, obtener_config
 from app.db import crear_fabrica_de_sesiones, crear_motor, esquema_creado
 from app.logs import configurar_logs
 from app.nucleo.ingesta import enviar_respuestas, ingerir
+from app.nucleo.procesamiento import Contexto
+from app.nucleo.worker import Worker
+from app.proveedores.stt import crear_proveedor_stt
 
 logger = logging.getLogger(__name__)
 
@@ -25,25 +28,36 @@ def crear_app(config: Config | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def ciclo_de_vida(_app: FastAPI) -> AsyncGenerator[None, None]:
-        """Arranca la recepción de mensajes al iniciar la aplicación y la detiene al cerrarla."""
+        """Arranca la recepción y el procesamiento de mensajes al iniciar la aplicación, y los
+        detiene al cerrarla."""
         motor = crear_motor(config.database_url)
         if not esquema_creado(motor):
             logger.error("La base de datos no tiene tablas: corre primero alembic upgrade head")
         fabrica_de_sesiones = crear_fabrica_de_sesiones(motor)
 
-        polling = None
+        polling = worker = None
         if config.telegram_mode == "polling":
             cliente = ClienteBotTelegram(config.telegram_bot_token.get_secret_value())
             adaptador = AdaptadorTelegram(cliente)
+            contexto = Contexto(
+                adaptadores={"telegram": adaptador},
+                stt=crear_proveedor_stt(config),
+                carpeta_audios=config.audio_dir,
+            )
+            worker = Worker(fabrica_de_sesiones, contexto)
 
             def manejar_update(update: dict[str, Any]) -> None:
                 enviar_respuestas(adaptador, ingerir(fabrica_de_sesiones, adaptador, update))
+                worker.despertar()  # si se guardó un mensaje, se procesa en segundo plano
 
             polling = PollingTelegram(cliente, manejar_update)
+            worker.iniciar()
             polling.iniciar()
         yield
         if polling:
             polling.detener()
+        if worker:
+            worker.detener()
         motor.dispose()
 
     app = FastAPI(title="Plataforma de salud del Hogar Misión de María", lifespan=ciclo_de_vida)

@@ -13,9 +13,10 @@ from app.canales.base import MensajeNormalizado
 from app.db import crear_fabrica_de_sesiones, crear_motor
 from app.modelos import Profesional
 
-# Los tests nunca se conectan a Telegram, aunque el .env local tenga TELEGRAM_MODE=polling:
-# las variables de entorno tienen prioridad sobre .env.
+# Los tests nunca se conectan a Telegram ni a OpenAI, aunque el .env local esté configurado
+# para hacerlo: las variables de entorno tienen prioridad sobre .env.
 os.environ["TELEGRAM_MODE"] = "off"
+os.environ["STT_PROVIDER"] = "fake"
 
 RAIZ = Path(__file__).resolve().parent.parent
 

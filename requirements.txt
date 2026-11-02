@@ -7,3 +7,5 @@ httpx2==2.16.0
 # Base de datos: SQLAlchemy (modelos y consultas) y Alembic (migraciones).
 sqlalchemy==2.1.6
 alembic==1.20.1
+# Transcripción de audios con la API de OpenAI.
+openai==3.42.1

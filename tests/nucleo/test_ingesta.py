@@ -2,7 +2,7 @@ import json
 
 from sqlalchemy import func, select
 
-from app.canales.base import AdaptadorCanal, Ignorado
+from app.canales.base import Ignorado
 from app.modelos import (
     EstadoMensaje,
     EventoAuditoria,
@@ -170,37 +170,13 @@ def test_un_mensaje_ignorado_no_tiene_respuesta(sesion):
 # De punta a punta, con un canal falso
 
 
-class CanalFalso(AdaptadorCanal):
-    canal = "telegram"
-
-    def __init__(self, mensaje):
-        self.mensaje = mensaje
-        self.enviados = []
-
-    def parsear(self, evento):
-        return self.mensaje
-
-    def enviar_texto(self, destino, texto, responder_a=None):
-        self.enviados.append((destino, texto, responder_a))
-        return f"{destino}:999"
-
-    def verificar_peticion(self, headers, body):
-        return True
-
-    def descargar_audio(self, referencia):
-        raise NotImplementedError
-
-    def borrar_mensaje(self, destino, id_mensaje_externo):
-        return True
-
-
 def test_ingerir_guarda_en_su_propia_transaccion_y_se_envia_la_respuesta(
-    fabrica_de_sesiones, sesion, profesional, crear_mensaje
+    fabrica_de_sesiones, sesion, profesional, crear_mensaje, canal_falso
 ):
     vincular(sesion, profesional)
-    canal = CanalFalso(crear_mensaje())
+    canal_falso.mensaje = crear_mensaje()
 
-    enviar_respuestas(canal, ingerir(fabrica_de_sesiones, canal, {"update_id": 1}))
+    enviar_respuestas(canal_falso, ingerir(fabrica_de_sesiones, canal_falso, {"update_id": 1}))
 
-    assert canal.enviados == [("55667788", textos.RECIBIDO, "55667788:412")]
+    assert canal_falso.enviados == [("55667788", textos.RECIBIDO, "55667788:412")]
     assert contar_mensajes(sesion) == 1

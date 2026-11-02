@@ -174,6 +174,17 @@ def test_borrar_un_mensaje_que_ya_no_se_puede_borrar(cliente_falso):
     assert AdaptadorTelegram(cliente).borrar_mensaje("55667788", "55667788:412") is False
 
 
+def test_indicar_procesando_muestra_escribiendo(cliente_falso):
+    cliente, peticiones = cliente_falso(
+        lambda peticion: httpx2.Response(200, json={"ok": True, "result": True})
+    )
+
+    AdaptadorTelegram(cliente).indicar_procesando("55667788")
+
+    assert peticiones[0].url.path.endswith("/sendChatAction")
+    assert json.loads(peticiones[0].content) == {"chat_id": "55667788", "action": "typing"}
+
+
 def test_descargar_una_nota_de_voz(cliente_falso, token_bot):
     def responder(peticion):
         if peticion.url.path == f"/bot{token_bot}/getFile":

@@ -62,6 +62,10 @@ class ClienteBotTelegram:
             "sendMessage", chat_id=chat_id, text=texto, reply_parameters=respuesta_a
         )
 
+    def enviar_accion(self, chat_id: str, accion: str = "typing") -> None:
+        """sendChatAction: muestra "escribiendo…" en el chat durante unos 5 segundos."""
+        self._llamar("sendChatAction", chat_id=chat_id, action=accion)
+
     def borrar_mensaje(self, chat_id: str, message_id: int) -> None:
         """deleteMessage. En chats privados se pueden borrar mensajes de menos de 48 horas."""
         self._llamar("deleteMessage", chat_id=chat_id, message_id=message_id)

@@ -1,6 +1,8 @@
 """Configuración de la aplicación, leída desde variables de entorno o desde el archivo .env."""
 
+import tempfile
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import SecretStr, model_validator
@@ -26,10 +28,20 @@ class Config(BaseSettings):
     # Contraseña de los usuarios de demostración que crea scripts/sembrar_datos.py.
     seed_password: SecretStr | None = None
 
+    # Transcripción de audios. fake: devuelve un texto fijo (tests y pruebas sin API key).
+    stt_provider: Literal["fake", "openai"] = "fake"
+    stt_model: str = "gpt-transcribe"
+    openai_api_key: SecretStr | None = None
+    # Carpeta donde se guarda cada audio solo mientras se transcribe. Por defecto, la carpeta
+    # temporal del usuario: fuera del repositorio y de OneDrive.
+    audio_dir: Path = Path(tempfile.gettempdir()) / "pds3-audios"
+
     @model_validator(mode="after")
-    def _exigir_token_de_telegram(self) -> "Config":
+    def _exigir_credenciales(self) -> "Config":
         if self.telegram_mode != "off" and not self.telegram_bot_token:
             raise ValueError(f"TELEGRAM_MODE={self.telegram_mode} requiere TELEGRAM_BOT_TOKEN")
+        if self.stt_provider == "openai" and not self.openai_api_key:
+            raise ValueError("STT_PROVIDER=openai requiere OPENAI_API_KEY")
         return self
 
 

@@ -11,6 +11,9 @@ NO_AUTORIZADO = "Esta cuenta no está autorizada para enviar registros."
 TIPO_NO_SOPORTADO = "Solo puedo recibir mensajes de texto o de audio."
 RECIBIDO = "Recibido. Estoy procesando el registro."
 AUDIO_DEMASIADO_LARGO = "El audio es demasiado largo. Envíalo en partes más cortas."
+ERROR = (
+    "No pude procesar el mensaje. Inténtalo de nuevo o registra la atención en la plataforma."
+)
 AYUDA = (
     "Envía un texto o un audio con los datos de la atención: residente, fecha, diagnóstico, "
     "indicaciones, próximo control y acompañante."

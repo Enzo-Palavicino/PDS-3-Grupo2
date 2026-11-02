@@ -62,3 +62,9 @@ class AdaptadorCanal(ABC):
     @abstractmethod
     def borrar_mensaje(self, destino: str, id_mensaje_externo: str) -> bool:
         """Borra un mensaje del chat. Devuelve False si el canal ya no permite borrarlo."""
+
+    def indicar_procesando(self, destino: str) -> None:
+        """Muestra en el chat que el bot está trabajando (en Telegram, "escribiendo…").
+
+        Es opcional: si el canal no tiene algo así, no hace nada.
+        """

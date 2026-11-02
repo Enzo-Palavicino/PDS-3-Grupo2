@@ -137,6 +137,32 @@ Desde ese momento, cada texto o audio que envíes queda guardado para procesarse
 responde "Recibido". Una cuenta sin vincular recibe "Esta cuenta no está autorizada para enviar
 registros", y su mensaje no se guarda.
 
+## Procesamiento de los mensajes
+
+Cada mensaje que el bot guarda lo procesa en segundo plano un worker: un hilo dentro de la misma
+aplicación, que usa la tabla `mensajes_entrantes` como cola. Así, recibir un mensaje nunca
+espera a la transcripción ni a la IA. Si un paso falla, el worker guarda solo el tipo de error y
+lo reintenta a los 10 s y a los 60 s. Si falla 3 veces, el mensaje queda en `error` y el bot le
+avisa al profesional.
+
+### Transcripción de audios
+
+`STT_PROVIDER` elige el proveedor:
+
+- `fake`, por defecto: devuelve siempre "Transcripción de prueba" y no necesita API key. Sirve
+  para los tests y para probar el flujo completo.
+- `openai`: usa la API de OpenAI con el modelo de `STT_MODEL` (`gpt-transcribe`). Necesita
+  `OPENAI_API_KEY`.
+
+El audio se descarga a un archivo temporal en `AUDIO_DIR` (por defecto, la carpeta temporal del
+sistema, fuera del repositorio), se transcribe y se borra apenas termina el intento, aunque haya
+fallado. La transcripción queda en la tabla `transcripciones`; el bot nunca la envía al chat.
+
+**Privacidad:** antes de llegar al modelo de lenguaje, el texto se seudonimiza. Un audio, en
+cambio, no se puede seudonimizar antes de transcribirlo, así que el proveedor de transcripción
+recibe datos identificables. En producción hay que usar una cuenta configurada sin retención de
+datos, o un modelo local como Whisper. En desarrollo y en la demo se usan solo datos ficticios.
+
 ## Tests y lint
 
 ```bash
@@ -161,7 +187,8 @@ app/
   canales/
     base.py       tipos comunes a todos los canales: MensajeNormalizado y AdaptadorCanal
     telegram/     cliente de la Bot API, adaptador y polling
-  nucleo/         lógica que no depende del canal: vinculación, ingesta de mensajes y auditoría
+  nucleo/         lógica que no depende del canal: vinculación, ingesta, worker y auditoría
+  proveedores/    proveedores de IA intercambiables por configuración (por ahora, transcripción)
 migrations/       migraciones de Alembic
 scripts/          scripts de desarrollo, como la carga de datos de demostración
 tests/            tests automáticos
