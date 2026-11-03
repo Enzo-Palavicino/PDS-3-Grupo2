@@ -131,6 +131,14 @@ Si cambias un modelo en `app/modelos.py`, crea su migración con
 `alembic revision --autogenerate -m "descripción"` y revísala antes de hacer commit. Un test
 falla si los modelos y las migraciones no coinciden.
 
+## WhatsApp con Kapso
+
+La integración recibe texto y audio, permite vincular profesionales por enlace/QR y reutiliza
+el procesamiento y los borradores de Telegram. Puede funcionar sola o junto con Telegram.
+
+Sigue la [guía de configuración y prueba de WhatsApp](docs/whatsapp-kapso.md): incluye los pasos
+en Kapso, las variables de `.env`, el túnel HTTPS y el registro del webhook.
+
 ## Bot de Telegram
 
 ### Crear el bot
@@ -405,7 +413,7 @@ Cómo se relaciona cada medida de este módulo con la normativa (sección 15 de 
   petición tarda cerca de un minuto. La base de datos gratuita vence; Render muestra la fecha en
   su panel.
 - **Borradores sin actividad:** solo se marcan en la web; nadie recibe un aviso.
-- **WhatsApp:** todavía no está. El núcleo ya está preparado para agregarlo como otro adaptador.
+- **WhatsApp:** implementado con Kapso; requiere configurar el número, las credenciales y el webhook HTTPS. Ver [guía](docs/whatsapp-kapso.md).
 
 ## Estructura
 

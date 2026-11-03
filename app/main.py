@@ -18,6 +18,9 @@ from app.canales.telegram import webhook as webhook_telegram
 from app.canales.telegram.adaptador import AdaptadorTelegram
 from app.canales.telegram.cliente import ClienteBotTelegram, ErrorTelegram
 from app.canales.telegram.polling import PollingTelegram
+from app.canales.whatsapp import webhook as webhook_whatsapp
+from app.canales.whatsapp.adaptador import AdaptadorWhatsApp
+from app.canales.whatsapp.cliente import ClienteKapso
 from app.config import Config, obtener_config
 from app.db import crear_fabrica_de_sesiones, crear_motor, esquema_creado
 from app.logs import configurar_logs
@@ -46,7 +49,9 @@ def crear_app(config: Config | None = None) -> FastAPI:
         mensajes. Al cerrar: los detiene."""
         motor = crear_motor(config.database_url)
         if not esquema_creado(motor):
-            logger.error("La base de datos no tiene tablas: corre primero alembic upgrade head")
+            logger.error(
+                "La base de datos no tiene tablas: corre primero alembic upgrade head"
+            )
         fabrica_de_sesiones = crear_fabrica_de_sesiones(motor)
         cliente = None
         if config.telegram_bot_token:
@@ -57,15 +62,29 @@ def crear_app(config: Config | None = None) -> FastAPI:
         aplicacion.state.usuario_bot = None
         aplicacion.state.webhook_telegram = None
         aplicacion.state.worker = None
+        aplicacion.state.webhook_whatsapp = None
 
         polling = worker = None
+        cliente_kapso = None
+        adaptadores = {}
+        if config.whatsapp_enabled:
+            cliente_kapso = ClienteKapso(
+                config.kapso_api_key.get_secret_value(), config.kapso_phone_number_id
+            )
+            whatsapp = AdaptadorWhatsApp(
+                cliente_kapso, config.kapso_webhook_secret.get_secret_value()
+            )
+            adaptadores["whatsapp"] = whatsapp
+            aplicacion.state.webhook_whatsapp = whatsapp
         if config.telegram_mode != "off":
             secreto = config.telegram_webhook_secret
             adaptador = AdaptadorTelegram(
                 cliente, secreto_webhook=secreto.get_secret_value() if secreto else None
             )
+            adaptadores["telegram"] = adaptador
+        if adaptadores:
             contexto = Contexto(
-                adaptadores={"telegram": adaptador},
+                adaptadores=adaptadores,
                 stt=crear_proveedor_stt(config),
                 llm=crear_proveedor_llm(config),
                 carpeta_audios=config.audio_dir,
@@ -76,6 +95,7 @@ def crear_app(config: Config | None = None) -> FastAPI:
             aplicacion.state.worker = worker
             worker.iniciar()
 
+        if config.telegram_mode != "off":
             if config.telegram_mode == "polling":
 
                 def manejar_update(update: dict[str, Any]) -> None:
@@ -95,6 +115,8 @@ def crear_app(config: Config | None = None) -> FastAPI:
             polling.detener()
         if worker:
             worker.detener()
+        if cliente_kapso:
+            cliente_kapso.cerrar()
         motor.dispose()
 
     # Con HTTPS, la aplicación está en el servidor público.
@@ -120,16 +142,23 @@ def crear_app(config: Config | None = None) -> FastAPI:
     app.include_router(vinculos.router)
     app.include_router(borradores.router)
     app.include_router(webhook_telegram.router)
+    app.include_router(webhook_whatsapp.router)
 
     @app.exception_handler(SesionRequerida)
     async def ir_al_inicio_de_sesion(request: Request, error: SesionRequerida):
-        return RedirectResponse(f"/login?siguiente={quote(error.siguiente)}", status_code=303)
+        return RedirectResponse(
+            f"/login?siguiente={quote(error.siguiente)}", status_code=303
+        )
 
     @app.exception_handler(StarletteHTTPException)
     async def pagina_de_error(request: Request, error: StarletteHTTPException):
         mensaje = error.detail
         if mensaje == HTTPStatus(error.status_code).phrase:  # texto genérico, en inglés
-            mensaje = "La página no existe." if error.status_code == 404 else "Ocurrió un error."
+            mensaje = (
+                "La página no existe."
+                if error.status_code == 404
+                else "Ocurrió un error."
+            )
         return pagina(
             request,
             "error.html",

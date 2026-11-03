@@ -92,6 +92,7 @@ class Worker:
             select(MensajeEntrante.id)
             .where(
                 MensajeEntrante.estado.in_(ESTADOS_PENDIENTES),
+                MensajeEntrante.canal.in_(self._contexto.adaptadores),
                 or_(
                     MensajeEntrante.proximo_intento_en.is_(None),
                     MensajeEntrante.proximo_intento_en <= ahora(),

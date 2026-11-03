@@ -23,6 +23,10 @@ services:
         value: webhook
       - key: TELEGRAM_DELETE_INCOMING
         value: "true"
+      # Para habilitar WhatsApp, cambia a true y agrega las variables de Kapso en Environment.
+      # Ver docs/whatsapp-kapso.md; no se requieren si está apagado.
+      - key: WHATSAPP_ENABLED
+        value: "false"
       - key: STT_PROVIDER
         value: openai
       - key: LLM_PROVIDER
