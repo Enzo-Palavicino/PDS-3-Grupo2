@@ -4,7 +4,8 @@ Genera un enlace de vinculación de un solo uso (con su código QR) y puede revo
 que se desactiva de inmediato.
 """
 
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
+from urllib.parse import quote
 
 import qrcode
 import qrcode.image.svg
@@ -42,13 +43,16 @@ def generar_enlace(
     sesion: SesionBD,
     usuario: Directora,
     profesional_id: Annotated[int, Form()],
+    canal: Annotated[Literal["telegram", "whatsapp"], Form()] = "telegram",
 ):
     profesional = sesion.get(Profesional, profesional_id)
     if profesional is None or not profesional.activo:
         raise HTTPException(404, "Ese profesional no existe.")
+    if canal == "whatsapp" and not request.app.state.config.whatsapp_enabled:
+        raise HTTPException(400, "WhatsApp no está habilitado.")
     codigo = generar_codigo(sesion, profesional.id, creado_por=usuario.id)
     sesion.commit()
-    enlace = _datos_del_enlace(request, profesional, codigo)
+    enlace = _datos_del_enlace(request, profesional, codigo, canal)
     return _pagina_de_vinculos(request, sesion, usuario, enlace=enlace)
 
 
@@ -63,7 +67,10 @@ def revocar(vinculo_id: int, sesion: SesionBD, usuario: Directora):
 
 
 def _pagina_de_vinculos(
-    request: Request, sesion: Session, usuario: UsuarioWeb, enlace: dict[str, Any] | None = None
+    request: Request,
+    sesion: Session,
+    usuario: UsuarioWeb,
+    enlace: dict[str, Any] | None = None,
 ):
     profesionales = sesion.scalars(
         select(Profesional).where(Profesional.activo).order_by(Profesional.nombre)
@@ -78,16 +85,27 @@ def _pagina_de_vinculos(
         profesionales=profesionales,
         vinculos=vinculos,
         enlace=enlace,
+        whatsapp_habilitado=request.app.state.config.whatsapp_enabled,
     )
 
 
 def _datos_del_enlace(
-    request: Request, profesional: Profesional, codigo: CodigoVinculacion
+    request: Request,
+    profesional: Profesional,
+    codigo: CodigoVinculacion,
+    canal: str = "telegram",
 ) -> dict[str, Any]:
-    usuario_bot = _usuario_del_bot(request)
-    url = f"https://t.me/{usuario_bot}?start={codigo.codigo}" if usuario_bot else None
+    if canal == "whatsapp":
+        numero = request.app.state.config.whatsapp_phone_number
+        url = f"https://wa.me/{numero}?text={quote('/start ' + codigo.codigo, safe='')}"
+    else:
+        usuario_bot = _usuario_del_bot(request)
+        url = (
+            f"https://t.me/{usuario_bot}?start={codigo.codigo}" if usuario_bot else None
+        )
     return {
         "profesional": profesional,
+        "canal": canal,
         "codigo": codigo.codigo,
         "url": url,
         "qr": _qr_en_svg(url) if url else None,

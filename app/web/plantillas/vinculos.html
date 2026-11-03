@@ -11,7 +11,7 @@ un solo uso y vence a los 10 minutos.</p>
   {% if enlace.url %}
     <div class="qr">{{ enlace.qr | safe }}</div>
     <p><a href="{{ enlace.url }}">{{ enlace.url }}</a></p>
-    <p>Pídele que lo abra en su celular (o que escanee el código) y pulse <strong>Iniciar</strong>.</p>
+    <p>Pídele que lo abra en su celular (o que escanee el código) y {% if enlace.canal == "whatsapp" %}envíe el mensaje que aparece escrito en WhatsApp{% else %}pulse <strong>Iniciar</strong>{% endif %}.</p>
   {% else %}
     <p>Pídele que le envíe al bot este mensaje:</p>
     <pre>/start {{ enlace.codigo }}</pre>
@@ -48,6 +48,14 @@ un solo uso y vence a los 10 minutos.</p>
         <form method="post" action="/vinculos/codigo">
           <input type="hidden" name="csrf" value="{{ csrf }}">
           <input type="hidden" name="profesional_id" value="{{ profesional.id }}">
+          {% if whatsapp_habilitado %}
+          <label>Canal
+            <select name="canal">
+              <option value="whatsapp">WhatsApp</option>
+              <option value="telegram">Telegram</option>
+            </select>
+          </label>
+          {% endif %}
           <button class="principal">Generar enlace</button>
         </form>
       </td>
