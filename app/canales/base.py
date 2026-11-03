@@ -1,4 +1,4 @@
-"""Tipos comunes a todos los canales de mensajería (Telegram ahora, WhatsApp después).
+"""Tipos comunes a todos los canales de mensajería (Telegram y WhatsApp).
 
 El núcleo de la aplicación trabaja solo con estos tipos, nunca con el formato propio de cada
 canal. Cada canal hereda AdaptadorCanal y traduce sus eventos a MensajeNormalizado.

@@ -156,7 +156,7 @@ def _responder(
         mensaje.destino_respuesta, texto, mensaje.id_externo
     )
     logger.info("Respuesta enviada para el borrador %s", borrador.id)
-    if contexto.borrar_mensajes_importados:
+    if contexto.borrar_mensajes_importados and mensaje.canal == "telegram":
         _borrar_del_chat(adaptador, mensaje)
 
 
