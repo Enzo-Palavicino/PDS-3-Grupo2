@@ -1,0 +1,10 @@
+{
+  "update_id": 900000005,
+  "message": {
+    "message_id": 77,
+    "from": {"id": 55667788, "is_bot": false, "first_name": "Prueba", "language_code": "es"},
+    "chat": {"id": -1001234567890, "title": "Grupo de prueba", "type": "supergroup"},
+    "date": 1793634000,
+    "text": "Hola a todos"
+  }
+}

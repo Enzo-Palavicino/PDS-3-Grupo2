@@ -1,0 +1,25 @@
+# Entorno virtual y cachés de Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Variables de entorno: contienen tokens y claves. Nunca se suben (el repositorio es público).
+.env
+.env.*
+!.env.example
+
+# Base de datos local y archivos generados
+data/
+*.db
+*.sqlite3
+
+# Editores y sistema operativo
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

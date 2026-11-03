@@ -1,0 +1,17 @@
+{
+  "update_id": 900000007,
+  "message": {
+    "message_id": 421,
+    "from": {"id": 55667788, "is_bot": false, "first_name": "Prueba", "language_code": "es"},
+    "chat": {"id": 55667788, "first_name": "Prueba", "type": "private"},
+    "date": 1793634000,
+    "reply_to_message": {
+      "message_id": 420,
+      "from": {"id": 7000000001, "is_bot": true, "first_name": "Bot de prueba", "username": "bot_de_prueba_bot"},
+      "chat": {"id": 55667788, "first_name": "Prueba", "type": "private"},
+      "date": 1793633900,
+      "text": "Mensaje del bot"
+    },
+    "text": "Respuesta de prueba al bot"
+  }
+}
