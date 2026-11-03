@@ -1,0 +1,21 @@
+# Dependencias de la aplicación, con versiones exactas para que todos usen las mismas.
+fastapi==0.162.0
+uvicorn[standard]==0.54.0
+pydantic-settings==2.16.2
+# Cliente HTTP para la Bot API de Telegram (también lo usa el TestClient de FastAPI).
+httpx2==2.16.0
+# Base de datos: SQLAlchemy (modelos y consultas), Alembic (migraciones) y el driver de
+# PostgreSQL, que se usa en el servidor.
+sqlalchemy==2.1.6
+alembic==1.20.1
+psycopg[binary]==3.3.6
+# SDK de OpenAI: transcripción (gpt-transcribe) y extracción con IA (gpt-6-luna).
+openai==3.42.1
+# Zonas horarias (America/Santiago): Windows no las trae instaladas.
+tzdata==2026.6
+# Plataforma web: plantillas HTML, formularios, cookie de sesión firmada y códigos QR (en SVG,
+# sin librerías de imágenes).
+jinja2==3.1.6
+python-multipart==0.0.33
+itsdangerous==2.2.0
+qrcode==8.2
