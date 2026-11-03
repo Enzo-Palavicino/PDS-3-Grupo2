@@ -16,6 +16,7 @@ from app.modelos import Profesional
 # Los tests nunca se conectan a Telegram ni a OpenAI, aunque el .env local esté configurado
 # para hacerlo: las variables de entorno tienen prioridad sobre .env.
 os.environ["TELEGRAM_MODE"] = "off"
+os.environ["WHATSAPP_ENABLED"] = "false"
 os.environ["STT_PROVIDER"] = "fake"
 os.environ["LLM_PROVIDER"] = "fake"
 

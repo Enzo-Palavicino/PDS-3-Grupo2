@@ -185,3 +185,10 @@ def test_al_despertarlo_procesa_un_mensaje_nuevo_sin_esperar_la_revision(
             time.sleep(0.05)
     finally:
         worker.detener()
+
+
+def test_no_procesa_mensajes_de_canales_apagados(fabrica_de_sesiones, contexto, guardar_mensaje):
+    mensaje = guardar_mensaje(canal="whatsapp", id_externo="wamid.pendiente")
+    assert Worker(fabrica_de_sesiones, contexto).procesar_pendientes() == 0
+    assert leer(fabrica_de_sesiones, mensaje.id).intentos == 0
+    assert leer(fabrica_de_sesiones, mensaje.id).estado == EstadoMensaje.RECIBIDO
