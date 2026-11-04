@@ -46,6 +46,12 @@ if context.is_offline_mode():
 else:
     motor = crear_motor(_url())
     with motor.connect() as conexion:
+        if conexion.dialect.name == "sqlite":
+            # Para cambiar una columna, SQLite recrea la tabla ("batch"): la borra y la vuelve a
+            # crear con los mismos datos. Con las claves foráneas activas no deja borrar una tabla
+            # a la que otras apuntan, así que se desactivan mientras corren las migraciones. Se
+            # hace fuera de una transacción: dentro, SQLite ignora este PRAGMA.
+            conexion.connection.dbapi_connection.execute("PRAGMA foreign_keys = OFF")
         context.configure(connection=conexion, **_opciones())
         with context.begin_transaction():
             context.run_migrations()

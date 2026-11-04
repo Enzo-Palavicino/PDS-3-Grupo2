@@ -146,7 +146,8 @@ class MensajeEntrante(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     canal: Mapped[str] = mapped_column(String(20))
-    id_externo: Mapped[str] = mapped_column(String(64))
+    # 255 y no 64: los ids de WhatsApp (wamid) miden más de 64 caracteres, unos 80 en Android.
+    id_externo: Mapped[str] = mapped_column(String(255))
     remitente_externo: Mapped[str] = mapped_column(String(64))
     destino_respuesta: Mapped[str] = mapped_column(String(64))
     profesional_id: Mapped[int | None] = mapped_column(ForeignKey("profesionales.id"))
@@ -158,7 +159,7 @@ class MensajeEntrante(Base):
     audio_duracion_seg: Mapped[int | None]
     # Archivo temporal del audio descargado; se borra apenas se transcribe.
     ruta_audio: Mapped[str | None] = mapped_column(String(255))
-    responde_a: Mapped[str | None] = mapped_column(String(64))  # id externo del mensaje respondido
+    responde_a: Mapped[str | None] = mapped_column(String(255))  # id externo del mensaje respondido
     recibido_en: Mapped[datetime] = mapped_column(FechaHoraUTC)
     estado: Mapped[str] = mapped_column(String(20), default=EstadoMensaje.RECIBIDO)
     intentos: Mapped[int] = mapped_column(default=0)
@@ -199,7 +200,7 @@ class BorradorAtencion(Base):
     ambiguedades: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
     estado: Mapped[str] = mapped_column(String(20), default=EstadoBorrador.PENDIENTE)
     # Último mensaje del bot sobre este borrador: si el profesional le responde, se completa.
-    mensaje_bot_id_externo: Mapped[str | None] = mapped_column(String(64))
+    mensaje_bot_id_externo: Mapped[str | None] = mapped_column(String(255))
     creado_en: Mapped[datetime] = mapped_column(FechaHoraUTC, default=ahora)
     actualizado_en: Mapped[datetime] = mapped_column(FechaHoraUTC, default=ahora, onupdate=ahora)
 

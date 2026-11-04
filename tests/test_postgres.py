@@ -1,19 +1,20 @@
 """Pruebas contra un PostgreSQL real, como el del servidor.
 
 Solo corren si está definida TEST_POSTGRES_URL (en el CI, un PostgreSQL en un contenedor).
-Revisan lo que cambia respecto de SQLite: las migraciones, el trigger de auditoría, los SAVEPOINT
-y el índice único parcial de los vínculos.
+Revisan lo que cambia respecto de SQLite: las migraciones, el trigger de auditoría, los SAVEPOINT,
+el índice único parcial de los vínculos y el largo máximo de los textos (SQLite no lo controla).
 """
 
 import os
 
 import pytest
 from alembic import command
-from sqlalchemy import func, select, text
+from sqlalchemy import delete, func, select, text
 from sqlalchemy.exc import DBAPIError, IntegrityError
 
 from app.db import crear_fabrica_de_sesiones, crear_motor
 from app.modelos import (
+    BorradorAtencion,
     EventoAuditoria,
     MensajeEntrante,
     Profesional,
@@ -97,3 +98,35 @@ def test_una_cuenta_no_puede_tener_dos_vinculos_activos(fabrica_postgres, profes
     vincular(activo=True)
     with pytest.raises(IntegrityError):
         vincular(activo=True)
+
+
+@pytest.mark.parametrize("largo", [80, 255])  # 80: lo que mide un wamid de WhatsApp en Android
+def test_guarda_ids_de_whatsapp_largos(
+    fabrica_postgres, profesional_postgres, crear_mensaje, largo
+):
+    def wamid(relleno: str) -> str:
+        return "wamid." + relleno * (largo - len("wamid."))
+
+    with fabrica_postgres.begin() as sesion:
+        mensaje = registrar_mensaje_entrante(
+            sesion,
+            crear_mensaje(
+                canal="whatsapp", id_externo=wamid("A"), responde_a_id_externo=wamid("B")
+            ),
+            profesional_postgres,
+        )
+        borrador = BorradorAtencion(
+            profesional_id=profesional_postgres, canal="whatsapp", mensaje_bot_id_externo=wamid("C")
+        )
+        sesion.add(borrador)
+
+    with fabrica_postgres() as sesion:
+        guardado = sesion.get(MensajeEntrante, mensaje.id)
+        assert (guardado.id_externo, guardado.responde_a) == (wamid("A"), wamid("B"))
+        assert sesion.get(BorradorAtencion, borrador.id).mensaje_bot_id_externo == wamid("C")
+
+    # Con ids de más de 64 caracteres guardados, la migración 0003 no se puede revertir, y la
+    # fixture revierte todas al terminar.
+    with fabrica_postgres.begin() as sesion:
+        sesion.execute(delete(BorradorAtencion))
+        sesion.execute(delete(MensajeEntrante))
