@@ -161,17 +161,23 @@ def _puede_descartar(usuario: UsuarioWeb, borrador: BorradorAtencion) -> bool:
 
 
 def filas_de_campos(campos: dict[str, Any]) -> list[dict[str, Any]]:
-    """Una fila por dato (etiqueta, valor y fragmento de origen). Los campos vacíos también
-    aparecen, para ver de un vistazo lo que falta."""
+    """Una fila por dato (clave, etiqueta, valor y fragmento de origen). Los campos vacíos también
+    aparecen, para ver de un vistazo lo que falta. La clave la usa la plantilla para agrupar los
+    campos y enlazar cada faltante o ambigüedad con su fila."""
     filas = []
     for clave, etiqueta in ETIQUETAS.items():
         dato = campos.get(clave)
         datos = [d for d in (dato if isinstance(dato, list) else [dato]) if d]
         if not datos:
-            filas.append({"etiqueta": etiqueta, "valor": None, "fragmento": None})
+            filas.append({"clave": clave, "etiqueta": etiqueta, "valor": None, "fragmento": None})
         for d in datos:
             filas.append(
-                {"etiqueta": etiqueta, "valor": _valor_legible(clave, d), "fragmento": d.get("fragmento")}
+                {
+                    "clave": clave,
+                    "etiqueta": etiqueta,
+                    "valor": _valor_legible(clave, d),
+                    "fragmento": d.get("fragmento"),
+                }
             )
     return filas
 

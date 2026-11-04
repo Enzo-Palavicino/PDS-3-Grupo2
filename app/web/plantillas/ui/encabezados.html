@@ -1,0 +1,26 @@
+{#- PageHeader (h1 único), SectionHeader (h2 + meta) y BackLink. -#}
+{%- from "ui/iconos.html" import icon as icono -%}
+
+{#- El contenido del bloque {% call %}, si lo hay, va junto al título (por ejemplo, el estado). -#}
+{% macro page_header(title, description=None) -%}
+<div class="page-header">
+  <div class="page-header__title">
+    <h1>{{ title }}</h1>
+    {%- if caller is defined %}{{ caller() }}{% endif %}
+  </div>
+  {%- if description %}
+  <p class="page-header__desc">{{ description }}</p>
+  {%- endif %}
+</div>
+{%- endmacro %}
+
+{% macro section_header(title, meta=None, id=None, level=2) -%}
+<div class="section-header">
+  <h{{ level }}{% if id %} id="{{ id }}"{% endif %}>{{ title }}</h{{ level }}>
+  {%- if meta %}<span class="section-header__meta">{{ meta }}</span>{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro back_link(href, label) -%}
+<a class="back-link" href="{{ href }}">{{ icono("arrow-left") }}{{ label }}</a>
+{%- endmacro %}

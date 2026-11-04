@@ -1,76 +1,71 @@
+{%- from "ui/iconos.html" import icon -%}
+{%- from "ui/formularios.html" import csrf_field -%}
+{%- set ROLES = {"directora": "Directora", "encargada_salud": "Encargada de salud", "profesional": "Profesional"} -%}
 <!doctype html>
 <html lang="es">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block titulo %}Plataforma de salud{% endblock %} · Hogar Misión de María</title>
+{#- Los estilos van en la misma página: no hay archivos estáticos que servir. -#}
 <style>
-  :root {
-    --texto: #1f2328; --tenue: #59636e; --borde: #d8dee4; --suave: #f6f8fa;
-    --acento: #0b6bcb; --peligro: #c62828; --aviso: #8a5a00; --ok: #1a7f37;
-  }
-  * { box-sizing: border-box; }
-  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-         color: var(--texto); background: #fff; line-height: 1.5; }
-  header { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; align-items: center;
-           justify-content: space-between; padding: .75rem 1.25rem;
-           border-bottom: 1px solid var(--borde); background: var(--suave); }
-  header nav { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; }
-  main { max-width: 980px; margin: 0 auto; padding: 1.25rem 1rem 3rem; }
-  h1 { font-size: 1.5rem; margin: .5rem 0 1rem; }
-  h2 { font-size: 1.15rem; margin: 1.75rem 0 .5rem; }
-  a { color: var(--acento); }
-  .tabla { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; margin: .5rem 0 1rem; }
-  th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid var(--borde);
-           vertical-align: top; }
-  th { background: var(--suave); font-weight: 600; white-space: nowrap; }
-  .tenue { color: var(--tenue); }
-  .falta, .error { color: var(--peligro); }
-  .aviso { color: var(--aviso); }
-  .etiqueta { display: inline-block; padding: 0 .55rem; border-radius: 999px; font-size: .85rem;
-              border: 1px solid currentColor; vertical-align: middle; }
-  .pendiente { color: var(--aviso); }
-  .descartado { color: var(--tenue); }
-  .sin-actividad { color: var(--peligro); }
-  .tarjeta { border: 1px solid var(--borde); border-radius: 8px; padding: .75rem 1rem;
-             margin: .75rem 0; }
-  .destacada { border-color: var(--acento); }
-  .angosta { max-width: 380px; margin: 3rem auto; }
-  label { display: block; margin: .75rem 0; }
-  input { display: block; width: 100%; margin-top: .25rem; padding: .45rem .6rem; font: inherit;
-          border: 1px solid var(--borde); border-radius: 6px; }
-  button { font: inherit; padding: .35rem .85rem; border-radius: 6px; cursor: pointer;
-           border: 1px solid var(--borde); background: #fff; color: var(--texto); }
-  button.principal { background: var(--acento); border-color: var(--acento); color: #fff; }
-  button.peligro { color: var(--peligro); border-color: var(--peligro); }
-  form.linea { display: inline; }
-  pre { white-space: pre-wrap; background: var(--suave); padding: .6rem .75rem;
-        border-radius: 6px; margin: .25rem 0; font-family: inherit; }
-  summary { cursor: pointer; }
-  .qr svg { width: 200px; height: 200px; }
+{% include "estilos/tokens.css" %}
+{% include "estilos/base.css" %}
+{% include "estilos/componentes.css" %}
+{% include "estilos/dominio.css" %}
 </style>
 </head>
 <body>
-<header>
-  <strong>Plataforma de salud · Hogar Misión de María</strong>
-  {% if usuario %}
-  <nav>
-    {% if usuario.rol == "directora" %}
-      <a href="/vinculos">Vínculos</a>
-    {% else %}
-      <a href="/borradores">Borradores</a>
-    {% endif %}
-    <span class="tenue">{{ usuario.usuario }}</span>
-    <form class="linea" method="post" action="/logout">
-      <input type="hidden" name="csrf" value="{{ csrf }}">
-      <button>Cerrar sesión</button>
+<a class="skip-link" href="#contenido">Saltar al contenido</a>
+<header class="app-header">
+  <div class="app-header__inner">
+    <div class="brand">
+      <span class="brand__mark" title="Espacio para el logotipo institucional" aria-hidden="true">MM</span>
+      <span class="brand__text">
+        <span class="brand__name">Hogar Misión de María</span>
+        <span class="brand__sub">Plataforma de salud</span>
+      </span>
+    </div>
+    {% if usuario %}
+    {#- Cada rol tiene una sola sección; el servidor decide el acceso. -#}
+    {%- set seccion = ("/vinculos", "Vínculos", "link") if usuario.rol == "directora" else ("/borradores", "Borradores", "file-text") %}
+    {%- set ruta = request.url.path %}
+    <nav class="app-nav" aria-label="Principal">
+      <a class="app-nav__link" href="{{ seccion[0] }}"
+         {%- if ruta == seccion[0] %} aria-current="page"{% elif ruta.startswith(seccion[0] ~ "/") %} aria-current="true"{% endif %}>
+        {{- icon(seccion[2]) }}{{ seccion[1] -}}
+      </a>
+    </nav>
+    <div class="app-user">
+      <span class="app-user__name">{{ usuario.usuario }}</span>
+      <span class="app-user__role">{{ ROLES.get(usuario.rol, usuario.rol) }}</span>
+    </div>
+    <form class="app-logout" method="post" action="/logout" data-enviando="Saliendo…">
+      {{ csrf_field(csrf) }}
+      <button class="btn btn--neutral" aria-label="Cerrar sesión">{{ icon("log-out") }}<span class="btn__label"><span class="app-logout__long">Cerrar sesión</span><span class="app-logout__short">Salir</span></span></button>
     </form>
-  </nav>
-  {% endif %}
+    {% endif %}
+  </div>
 </header>
-<main>
+<main id="contenido" tabindex="-1" class="{% block clase_main %}page{% endblock %}">
 {% block contenido %}{% endblock %}
 </main>
+{%- if usuario %}
+{#- Diálogo de confirmación (JS progresivo): lo llena progresivo.js con los data-confirm-* del
+    formulario. Sin JS no se usa y queda el confirm() nativo. #}
+<dialog class="dialog" id="dialogo-confirmacion" aria-labelledby="dialogo-titulo" aria-describedby="dialogo-texto">
+  <form method="dialog" class="dialog__panel">
+    <h2 class="dialog__title" id="dialogo-titulo"></h2>
+    <p class="dialog__body" id="dialogo-texto"></p>
+    <div class="dialog__actions">
+      <button class="btn btn--neutral" value="cancelar">Cancelar</button>
+      <button class="btn btn--danger-solid" value="confirmar">Confirmar</button>
+    </div>
+  </form>
+</dialog>
+{%- endif %}
+<script>
+{% include "scripts/progresivo.js" %}
+</script>
 </body>
 </html>

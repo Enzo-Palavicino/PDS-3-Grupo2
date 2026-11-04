@@ -1,0 +1,92 @@
+/* Tokens del sistema de diseño (Claude Design, "01 Sistema de diseño", handoff §3).
+   Es el único archivo con colores en hexadecimal: el resto de los estilos usa estas variables. */
+:root {
+  /* Color · acción */
+  --color-primary: #2B5C99;          /* blanco encima 6,79:1 */
+  --color-primary-hover: #234D82;
+  --color-primary-active: #1B3D68;
+  --color-on-primary: #FFFFFF;
+  --color-secondary: #E3EEFA;        /* celeste: botón secundario, avisos info, etiquetas de canal */
+  --color-secondary-hover: #D3E4F7;
+  --color-secondary-active: #BCD5F0;
+  --color-on-secondary: #1F4775;     /* 8,07:1 sobre --color-secondary */
+  --color-accent-soft: #BCD5F0;      /* pastel: bordes info, decoración */
+
+  /* Superficies */
+  --color-bg: #F3F6FA;
+  --color-surface: #FFFFFF;
+  --color-surface-subtle: #F7F9FC;   /* th, metadatos, fragmentos */
+  --color-surface-sunken: #EEF2F7;   /* pre, transcripciones */
+
+  /* Bordes */
+  --color-border: #D9E1EA;           /* decorativo, 1,32:1 */
+  --color-border-subtle: #EEF2F7;    /* separador entre filas */
+  --color-border-strong: #7A8AA0;    /* controles, 3,52:1 (WCAG 1.4.11) */
+
+  /* Texto */
+  --color-text: #1A2433;             /* 15,62:1 */
+  --color-text-secondary: #4B5A6D;   /* 7,04:1 */
+  --color-text-disabled: #8995A5;
+  --color-disabled-bg: #EEF1F5;
+
+  /* Estados */
+  --color-success: #1E7148; --color-success-bg: #E5F3EB; --color-success-border: #A8D5BC;
+  --color-warning: #835400; --color-warning-bg: #FDF3DC; --color-warning-border: #EDCF8E;
+  --color-danger:  #B3261E; --color-danger-bg:  #FCEBEA; --color-danger-border:  #F0B8B3;
+  --color-danger-hover: #932019; --color-danger-active: #7A1B15; --color-danger-subtle-active: #F8DAD7;
+  --color-info:    #2B5C99; --color-info-bg:    #E3EEFA; --color-info-border:    #BCD5F0;
+  --color-focus: #2B5C99;
+
+  /* Tintes de fila que usan las pantallas del diseño (03 y 04) */
+  --color-row-highlight: #F7FAFE;    /* profesional con enlace recién generado */
+  --color-danger-tint: #FFF8F7;      /* campo obligatorio faltante */
+  --color-warning-tint: #FFFCF4;     /* campo ambiguo */
+  --color-scrim: rgba(26, 36, 51, .45); /* fondo del diálogo de confirmación */
+
+  /* Tipografía */
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --text-h1: 600 1.75rem/2.25rem var(--font-sans);      /* 28/36; móvil 24/32 */
+  --text-h1-mobile: 600 1.5rem/2rem var(--font-sans);
+  --text-h2: 600 1.25rem/1.75rem var(--font-sans);      /* 20/28 */
+  --text-h3: 600 1rem/1.5rem var(--font-sans);          /* 16/24 */
+  --text-body: 400 1rem/1.5rem var(--font-sans);        /* 16/24 */
+  --text-body-sm: 400 .875rem/1.25rem var(--font-sans); /* 14/20 tablas */
+  --text-label: 500 .875rem/1.25rem var(--font-sans);
+  --text-button: 500 .9375rem/1.25rem var(--font-sans); /* 15/20; móvil 16 */
+  --text-meta: 400 .8125rem/1.125rem var(--font-sans);  /* 13/18 */
+  --text-overline: 600 .75rem/1rem var(--font-sans);    /* + uppercase, letter-spacing .04em */
+  --text-mono: 500 .8125rem/1.125rem var(--font-mono);
+
+  /* Espaciado (base 4) */
+  --space-1: .25rem; --space-2: .5rem; --space-3: .75rem; --space-4: 1rem; --space-5: 1.25rem;
+  --space-6: 1.5rem; --space-8: 2rem; --space-10: 2.5rem; --space-12: 3rem; --space-16: 4rem;
+
+  /* Radios, bordes, sombras */
+  --radius-sm: 4px; --radius-md: 6px; --radius-lg: 10px; --radius-xl: 14px; --radius-full: 999px;
+  --border-width: 1px;
+  --shadow-xs: 0 1px 2px rgba(26,36,51,.05);
+  --shadow-sm: 0 1px 3px rgba(26,36,51,.08), 0 1px 2px rgba(26,36,51,.04);
+  --shadow-md: 0 8px 24px rgba(26,36,51,.12);
+  --ring-highlight: 0 0 0 3px var(--color-secondary);   /* tarjeta destacada */
+
+  /* Foco y movimiento */
+  --focus-ring: 2px solid var(--color-focus);
+  --focus-offset: 2px;
+  --duration-fast: 120ms;            /* color y fondo; respuesta al presionar */
+  --duration-base: 180ms;            /* apertura de details y del diálogo */
+  --ease-standard: cubic-bezier(.2,0,0,1);
+  /* Agregados según las skills de movimiento (emil-design-eng, apple-design): */
+  --ease-out: cubic-bezier(.23,1,.32,1); /* entradas: arranca rápido, se siente inmediato */
+  --duration-enter: 200ms;           /* aparición de un resultado (panel de enlace generado) */
+  --press-scale: .97;                /* botón presionado */
+
+  /* Layout */
+  --container-md: 1200px; --container-sm: 400px;
+  --control-h: 2.5rem;       /* 40px */
+  --control-h-touch: 2.75rem;/* 44px, mínimo en ≤600px */
+  --header-h: 4rem;
+}
+/* Con prefers-reduced-motion no se anulan todas las duraciones (como proponía el token del
+   diseño): siguiendo las skills, se quita el movimiento (escala, desplazamiento) y se conservan
+   los fundidos cortos de opacidad y color, que ayudan a entender el cambio. Ver base.css. */

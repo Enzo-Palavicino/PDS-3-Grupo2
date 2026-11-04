@@ -1,0 +1,30 @@
+{#- Alert y EmptyState. -#}
+{%- from "ui/iconos.html" import icon as icono -%}
+
+{#- Aviso en línea. tone: info · warning · danger · success · neutral. El contenido va en el
+    bloque {% call %}. role: "alert" solo para un error tras un envío, "status" para un
+    resultado, "note" para el aviso de IA. -#}
+{% macro alert(tone="info", title=None, role=None, icon=None, compact=False) -%}
+{%- set por_defecto = {"info": "info", "warning": "triangle-alert", "danger": "circle-alert", "success": "circle-check", "neutral": "info"} -%}
+<div class="alert alert--{{ tone }}{{ ' alert--compact' if compact }}"{% if role %} role="{{ role }}"{% endif %}>
+  <span class="alert__icon">{{ icono(icon or por_defecto.get(tone, "info"), 16 if compact else 18) }}</span>
+  <div class="alert__content">
+    {%- if title %}<p class="alert__title">{{ title }}</p>{% endif %}
+    <p>{{ caller() }}</p>
+  </div>
+</div>
+{%- endmacro %}
+
+{#- Explica por qué una colección está vacía y qué la llena. Nunca ofrece acciones que no
+    existen. size: "wide" (página) o "compact" (dentro de una sección). -#}
+{% macro empty_state(title, body=None, icon="inbox", size="wide") -%}
+<div class="empty{{ ' empty--compact' if size == 'compact' }}">
+  <span class="empty__icon">{{ icono(icon, 18 if size == "compact" else 22) }}</span>
+  {%- if size == "compact" %}
+  <p class="empty__body">{{ title }}</p>
+  {%- else %}
+  <p class="empty__title">{{ title }}</p>
+  {%- if body %}<p class="empty__body">{{ body }}</p>{% endif %}
+  {%- endif %}
+</div>
+{%- endmacro %}

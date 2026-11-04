@@ -1,0 +1,18 @@
+{#- Button: envía un formulario o navega (enlace con aspecto de botón).
+    variant: primary · secondary · neutral · danger · danger-solid · ghost · ghost-danger.
+    size: None (40 px) · "sm" (32 px, solo escritorio) · "lg" (44 px). -#}
+{%- from "ui/iconos.html" import icon as icono -%}
+
+{% macro button(label, variant="neutral", type="submit", icon=None, size=None, aria_label=None, block=False, clase="") -%}
+<button type="{{ type }}" class="btn btn--{{ variant }}{{ ' btn--' ~ size if size }}{{ ' btn--block' if block }}{{ ' ' ~ clase if clase }}"
+  {%- if aria_label %} aria-label="{{ aria_label }}"{% endif %}>
+  {{- icono(icon) if icon }}<span class="btn__label">{{ label }}</span>
+</button>
+{%- endmacro %}
+
+{% macro link_button(label, href, variant="neutral", icon=None, size=None, block=False, external=False, clase="") -%}
+<a href="{{ href }}" class="btn btn--{{ variant }}{{ ' btn--' ~ size if size }}{{ ' btn--block' if block }}{{ ' ' ~ clase if clase }}"
+  {%- if external %} target="_blank" rel="noopener noreferrer"{% endif %}>
+  {{- icono(icon) if icon }}<span class="btn__label">{{ label }}</span>
+</a>
+{%- endmacro %}

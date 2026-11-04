@@ -1,20 +1,23 @@
 {% extends "base.html" %}
+{%- from "ui/formularios.html" import csrf_field, field -%}
+{%- from "ui/botones.html" import button -%}
+{%- from "ui/avisos.html" import alert -%}
+{%- from "ui/encabezados.html" import page_header -%}
 {% block titulo %}Iniciar sesión{% endblock %}
+{% block clase_main %}page page--centered{% endblock %}
 {% block contenido %}
-<section class="tarjeta angosta">
-  <h1>Iniciar sesión</h1>
-  {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
-  <form method="post" action="/login">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
+<div class="login">
+  {{ page_header("Iniciar sesión", "Acceso para profesionales y personal autorizado del Hogar.") }}
+  <form class="card login__form" method="post" action="/login" data-enviando="Entrando…">
+    {%- if error %}
+    {% call alert("danger", role="alert", compact=True) %}{{ error }}{% endcall %}
+    {%- endif %}
+    {{ csrf_field(csrf) }}
     <input type="hidden" name="siguiente" value="{{ siguiente }}">
-    <label>Usuario
-      <input name="usuario" autocomplete="username" required autofocus>
-    </label>
-    <label>Contraseña
-      <input name="password" type="password" autocomplete="current-password" required>
-    </label>
-    <button class="principal">Entrar</button>
+    {{ field("usuario", "Usuario", autocomplete="username", required=True, autofocus=True, size="lg") }}
+    {{ field("password", "Contraseña", type="password", autocomplete="current-password", required=True, size="lg") }}
+    {{ button("Entrar", "primary", size="lg", block=True) }}
   </form>
-  <p class="tenue">Entorno de demostración: todos los datos son ficticios.</p>
-</section>
+  {% call alert("info", compact=True) %}Entorno de demostración: todos los datos son ficticios.{% endcall %}
+</div>
 {% endblock %}

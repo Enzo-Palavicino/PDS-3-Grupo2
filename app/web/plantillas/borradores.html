@@ -1,49 +1,31 @@
 {% extends "base.html" %}
-{% block titulo %}Borradores{% endblock %}
+{%- from "ui/avisos.html" import alert, empty_state -%}
+{%- from "ui/encabezados.html" import page_header -%}
+{%- from "dominio/borradores.html" import drafts_table -%}
+{#- El texto depende del rol; el filtro de qué borradores ve cada uno sigue en el servidor. -#}
+{%- set es_profesional = usuario.rol == "profesional" -%}
+{%- set titulo = "Mis borradores" if es_profesional else "Borradores de atención" -%}
+{% block titulo %}{{ titulo }}{% endblock %}
+{% block clase_main %}page page--list{% endblock %}
 {% block contenido %}
-<h1>Borradores de atención</h1>
-<p class="tenue">Los genera la IA a partir de los mensajes de los profesionales. Ninguno es una
-atención registrada hasta que un profesional lo revise.</p>
-{% if ids_sin_actividad %}
-<p class="aviso">Los borradores marcados <span class="etiqueta sin-actividad">sin actividad</span>
-no cambian hace más de {{ dias_sin_actividad }} días: revísalos y complétalos o descártalos.</p>
-{% endif %}
+{{ page_header(titulo,
+    "Solo los borradores generados desde tus cuentas vinculadas." if es_profesional
+    else "Todos los borradores recibidos por mensajería, del más reciente al más antiguo. Incluye pendientes y descartados.") }}
 
-{% if filas %}
-<div class="tabla">
-<table>
-  <thead>
-    <tr><th>#</th><th>Creado</th><th>Residente</th><th>Profesional</th><th>Canal</th>
-        <th>Falta</th><th>Estado</th></tr>
-  </thead>
-  <tbody>
-  {% for borrador, profesional, residente in filas %}
-    <tr>
-      <td><a href="/borradores/{{ borrador.id }}">#{{ borrador.id }}</a></td>
-      <td>{{ borrador.creado_en | hora_chile }}</td>
-      <td>
-        {% if residente %}{{ residente.nombres }} {{ residente.apellidos }}
-        {% else %}<span class="falta">Sin identificar</span>{% endif %}
-      </td>
-      <td>{{ profesional.nombre }}</td>
-      <td>{{ borrador.canal | capitalize }}</td>
-      <td>
-        {% if borrador.faltantes %}
-          {{ borrador.faltantes | map(attribute="descripcion") | join(", ") }}
-        {% else %}<span class="tenue">—</span>{% endif %}
-      </td>
-      <td>
-        <span class="etiqueta {{ borrador.estado }}">{{ borrador.estado }}</span>
-        {% if borrador.id in ids_sin_actividad %}
-          <span class="etiqueta sin-actividad">sin actividad</span>
-        {% endif %}
-      </td>
-    </tr>
-  {% endfor %}
-  </tbody>
-</table>
-</div>
-{% else %}
-<p>Todavía no hay borradores.</p>
-{% endif %}
+{%- if ids_sin_actividad %}
+{% call alert("warning", icon="hourglass", compact=True) -%}
+<strong>Sin actividad</strong> marca borradores pendientes sin cambios por más de {{ dias_sin_actividad }} días. Es informativa: no cambia el estado ni elimina el borrador.
+{%- endcall %}
+{%- endif %}
+
+{%- if filas %}
+{{ drafts_table(filas, ids_sin_actividad, titulo) }}
+<p class="meta">{{ filas | length }} {{ "borrador" if filas | length == 1 else "borradores" }}</p>
+{%- elif es_profesional %}
+{{ empty_state("Todavía no tienes borradores",
+    "Se crean cuando envías por WhatsApp o Telegram un audio o texto con una atención, desde una cuenta vinculada por la dirección.") }}
+{%- else %}
+{{ empty_state("Todavía no hay borradores",
+    "Se crean cuando un profesional envía por WhatsApp o Telegram un audio o texto con una atención, desde una cuenta vinculada por la dirección.") }}
+{%- endif %}
 {% endblock %}

@@ -1,67 +1,24 @@
 {% extends "base.html" %}
+{%- from "ui/avisos.html" import empty_state -%}
+{%- from "ui/encabezados.html" import page_header -%}
+{%- from "dominio/vinculos.html" import connection_panel, professionals_table -%}
 {% block titulo %}Vínculos{% endblock %}
+{% block clase_main %}page page--links{% endblock %}
 {% block contenido %}
-<h1>Vínculos de mensajería</h1>
-<p class="tenue">Solo las cuentas vinculadas pueden enviar registros por el bot. Cada enlace es de
-un solo uso y vence a los 10 minutos.</p>
+{{ page_header("Vínculos de mensajería",
+    "Autoriza las cuentas de " ~ ("WhatsApp o Telegram" if whatsapp_habilitado else "Telegram")
+    ~ " desde las que cada profesional envía atenciones. Una cuenta vinculada puede crear borradores a nombre de ese profesional.") }}
 
-{% if enlace %}
-<section class="tarjeta destacada">
-  <h2>Enlace de vinculación para {{ enlace.profesional.nombre }}</h2>
-  {% if enlace.url %}
-    <div class="qr">{{ enlace.qr | safe }}</div>
-    <p><a href="{{ enlace.url }}">{{ enlace.url }}</a></p>
-    <p>Pídele que lo abra en su celular (o que escanee el código) y {% if enlace.canal == "whatsapp" %}envíe el mensaje que aparece escrito en WhatsApp{% else %}pulse <strong>Iniciar</strong>{% endif %}.</p>
-  {% else %}
-    <p>Pídele que le envíe al bot este mensaje:</p>
-    <pre>/start {{ enlace.codigo }}</pre>
-  {% endif %}
-  <p class="tenue">Vence el {{ enlace.expira_en | hora_chile }}.</p>
-</section>
-{% endif %}
+{%- if enlace %}
+{{ connection_panel(enlace) }}
+{%- endif %}
 
-<div class="tabla">
-<table>
-  <thead>
-    <tr><th>Profesional</th><th>Especialidad</th><th>Cuentas vinculadas</th><th></th></tr>
-  </thead>
-  <tbody>
-  {% for profesional in profesionales %}
-    <tr>
-      <td>{{ profesional.nombre }}</td>
-      <td>{{ profesional.especialidad }}</td>
-      <td>
-        {% for vinculo in vinculos.get(profesional.id, []) %}
-          <div>
-            {{ vinculo.canal | capitalize }}, desde el {{ vinculo.creado_en | hora_chile }}
-            <form class="linea" method="post" action="/vinculos/{{ vinculo.id }}/revocar"
-                  onsubmit="return confirm('¿Revocar este vínculo? La cuenta no podrá enviar más registros.')">
-              <input type="hidden" name="csrf" value="{{ csrf }}">
-              <button class="peligro">Revocar</button>
-            </form>
-          </div>
-        {% else %}
-          <span class="tenue">Sin cuentas vinculadas</span>
-        {% endfor %}
-      </td>
-      <td>
-        <form method="post" action="/vinculos/codigo">
-          <input type="hidden" name="csrf" value="{{ csrf }}">
-          <input type="hidden" name="profesional_id" value="{{ profesional.id }}">
-          {% if whatsapp_habilitado %}
-          <label>Canal
-            <select name="canal">
-              <option value="whatsapp">WhatsApp</option>
-              <option value="telegram">Telegram</option>
-            </select>
-          </label>
-          {% endif %}
-          <button class="principal">Generar enlace</button>
-        </form>
-      </td>
-    </tr>
-  {% endfor %}
-  </tbody>
-</table>
-</div>
+{%- if profesionales %}
+<h2 class="only-narrow pros__title">Profesionales</h2>
+{{ professionals_table(profesionales, vinculos, whatsapp_habilitado, enlace, csrf) }}
+{%- else %}
+{{ empty_state("No hay profesionales activos",
+    "Los vínculos se crean para profesionales activos. La gestión de profesionales no está disponible en esta plataforma.",
+    icon="users") }}
+{%- endif %}
 {% endblock %}

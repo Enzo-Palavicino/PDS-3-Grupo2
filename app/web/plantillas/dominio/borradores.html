@@ -1,0 +1,259 @@
+{#- Componentes del dominio de borradores (V03 y V04). Solo presentan lo que ya entrega el
+    servidor: no agregan datos ni acciones. -#}
+{%- from "ui/iconos.html" import icon -%}
+{%- from "ui/etiquetas.html" import badge, draft_status, channel_name, channel_inline, capitalizar -%}
+{%- from "ui/avisos.html" import empty_state -%}
+{%- from "ui/botones.html" import button -%}
+{%- from "ui/formularios.html" import csrf_field -%}
+{%- from "ui/encabezados.html" import section_header -%}
+
+{#- Grupos temáticos del visor de evidencia. Conservan el orden original de los 14 campos. -#}
+{%- set GRUPOS = [
+  ("Identificación y contexto", "user", ["residente", "fecha_atencion", "hora_atencion", "lugar", "especialidad"]),
+  ("Motivo y evaluación", "stethoscope", ["motivo", "diagnosticos", "evolucion_clinica", "observaciones"]),
+  ("Indicaciones", "pill", ["indicaciones_farmacologicas", "otras_indicaciones", "examenes_solicitados"]),
+  ("Seguimiento", "calendar", ["proximo_control", "acompanante"]),
+] -%}
+{#- Un faltante "diagnóstico o motivo" corresponde a dos campos; su ancla lleva al primero. -#}
+{%- set CAMPOS_DEL_FALTANTE = {"diagnostico_o_motivo": ["motivo", "diagnosticos"]} -%}
+
+{% macro nombre_residente(residente) -%}
+{%- if residente %}{{ residente.nombres }} {{ residente.apellidos }}{% else %}Sin identificar{% endif -%}
+{%- endmacro %}
+
+{#- DraftSummary · encabezado del detalle: pares etiqueta/valor. -#}
+{% macro draft_meta(borrador, residente, profesional) -%}
+<dl class="meta-list draft-meta">
+  <div class="draft-meta__residente">
+    <dt>Residente</dt>
+    <dd>{% if residente %}{{ nombre_residente(residente) }} <span class="code">{{ residente.codigo }}</span>{% else %}<span class="missing">Sin identificar</span>{% endif %}</dd>
+  </div>
+  <div><dt>Profesional</dt><dd>{{ profesional.nombre }}</dd></div>
+  <div><dt>Especialidad</dt><dd>{{ capitalizar(profesional.especialidad) }}</dd></div>
+  <div><dt>Canal</dt><dd>{{ channel_inline(borrador.canal) }}</dd></div>
+  <div><dt>Creado</dt><dd>{{ borrador.creado_en | hora_chile }}</dd></div>
+</dl>
+{%- endmacro %}
+
+{#- EvidenceViewer: cada campo con sus valores y el fragmento de origen de cada uno. Los campos
+    faltantes y ambiguos se marcan en su fila, que es el destino de las anclas de "Por revisar". -#}
+{% macro evidence_viewer(filas, faltantes, ambiguedades, nombres) -%}
+{%- set conocidas = GRUPOS | map(attribute=2) | sum(start=[]) -%}
+{%- set otras = filas | map(attribute="clave") | reject("in", conocidas) | unique | list -%}
+{%- set grupos = GRUPOS + ([("Otros datos", "file-text", otras)] if otras else []) -%}
+{%- set total = filas | map(attribute="clave") | unique | list | length -%}
+<section class="section" aria-labelledby="t-datos">
+  {{ section_header("Datos extraídos", total ~ " campos · los vacíos se muestran como “Sin dato”", "t-datos") }}
+  <div class="card card--flush evidence">
+    <table class="evidence__table">
+      <caption class="visually-hidden">Datos extraídos por la IA, cada uno con su fragmento de origen</caption>
+      <thead class="evidence__head">
+        <tr><th scope="col">Campo</th><th scope="col">Valor extraído</th><th scope="col">Fragmento de origen</th></tr>
+      </thead>
+      {%- for titulo, icono_grupo, claves in grupos %}
+      {%- set filas_grupo = filas | selectattr("clave", "in", claves) | list %}
+      {%- if filas_grupo %}
+      <tbody class="evidence__group">
+        <tr><th scope="rowgroup" colspan="3" class="evidence__group-title"><span>{{ icon(icono_grupo) }}{{ titulo }}</span></th></tr>
+        {%- for clave in claves %}
+        {%- set entradas = filas | selectattr("clave", "equalto", clave) | list %}
+        {%- if entradas %}
+        {%- set estado = namespace(obligatorio=false, esperado=false) %}
+        {%- for falta in faltantes or [] %}
+          {%- if clave in CAMPOS_DEL_FALTANTE.get(falta.campo, [falta.campo]) %}
+            {%- if falta.obligatorio %}{% set estado.obligatorio = true %}{% else %}{% set estado.esperado = true %}{% endif %}
+          {%- endif %}
+        {%- endfor %}
+        {%- set dudas = (ambiguedades or []) | selectattr("campo", "equalto", clave) | list %}
+        <tr id="f-{{ clave }}" class="evidence__row{{ ' is-required' if estado.obligatorio }}{{ ' is-ambiguous' if dudas and not estado.obligatorio }}">
+          <th scope="row" class="evidence__label">
+            <span class="evidence__label-inner">
+              <span>{{ entradas[0].etiqueta }}</span>
+              {%- if estado.obligatorio %}<span class="chip chip--caps chip--required">Falta · obligatorio</span>
+              {%- elif dudas %}<span class="chip chip--caps chip--ambiguous">Ambiguo</span>
+              {%- elif estado.esperado %}<span class="chip chip--caps chip--expected">Falta · esperado</span>{% endif %}
+            </span>
+          </th>
+          <td colspan="2" class="evidence__entries">
+            {%- for entrada in entradas %}
+            <div class="evidence__entry">
+              <div class="evidence__value">
+                <span class="visually-hidden">Valor extraído: </span>
+                {%- if entrada.valor %}{{ entrada.valor | con_nombres(nombres) }}
+                {%- else %}<span class="evidence__empty">— <small>Sin dato</small></span>{% endif -%}
+              </div>
+              <div class="evidence__source">
+                {%- if entrada.fragmento %}
+                <div class="quote">
+                  <span class="quote__label">{{ icon("quote", 14) }}<span class="quote__label-text">Fragmento de origen</span></span>
+                  <span class="quote__text">«{{ entrada.fragmento | con_nombres(nombres) }}»</span>
+                </div>
+                {%- elif clave == "especialidad" and entrada.valor %}
+                <span class="evidence__note">Proviene del profesional vinculado, no del mensaje.</span>
+                {%- else %}
+                <span class="evidence__empty">— Sin fragmento</span>
+                {%- endif %}
+              </div>
+            </div>
+            {%- endfor %}
+            {%- for duda in dudas %}
+            <p class="evidence__ambiguity">{{ icon("circle-help", 14) }}<span>{{ duda.motivo | con_nombres(nombres) }}</span></p>
+            {%- endfor %}
+          </td>
+        </tr>
+        {%- endif %}
+        {%- endfor %}
+      </tbody>
+      {%- endif %}
+      {%- endfor %}
+    </table>
+  </div>
+</section>
+{%- endmacro %}
+
+{#- SourceMessage: texto o audio transcrito, en orden de llegada. -#}
+{% macro source_messages(mensajes) -%}
+{%- set n = mensajes | length %}
+<section class="section" aria-labelledby="t-mensajes">
+  {{ section_header("Mensajes de origen", (n ~ (" mensaje" if n == 1 else " mensajes") ~ " · orden de llegada") if n else None, "t-mensajes") }}
+  {%- for mensaje, transcripcion in mensajes %}
+  {%- set es_audio = mensaje.tipo == "audio" %}
+  <article class="card source">
+    <div class="source__head">
+      {{ badge("Audio" if es_audio else "Texto", "info", "mic" if es_audio else "message-square") }}
+      <span class="source__title">Mensaje {{ loop.index }}</span>
+      <span class="meta">{{ channel_name(mensaje.canal) }} · {{ mensaje.recibido_en | hora_chile }}</span>
+    </div>
+    {%- if transcripcion %}
+    <p class="source__trans">{{ icon("scan-text", 14) }}Transcripción · <span class="mono">{{ transcripcion.proveedor }} · {{ transcripcion.modelo }}</span></p>
+    <p class="pre">{{ transcripcion.texto }}</p>
+    {%- else %}
+    <p class="pre">{{ mensaje.texto or "—" }}</p>
+    {%- endif %}
+  </article>
+  {%- else %}
+  {{ empty_state("No hay mensajes asociados a este borrador.", icon="inbox", size="compact") }}
+  {%- endfor %}
+</section>
+{%- endmacro %}
+
+{#- AIProcessingHistory: historial de extracciones (no es progreso en curso), de la más reciente a
+    la más antigua. Cada una se abre para ver la entrada seudonimizada que recibió la IA. -#}
+{% macro ai_history(extracciones) -%}
+{%- set n = extracciones | length %}
+<section class="section" aria-labelledby="t-ia">
+  {{ section_header("Procesamiento con IA", "Historial de extracciones · no es progreso en curso", "t-ia") }}
+  {%- if extracciones %}
+  <div class="card card--flush ai-history">
+    {%- for extraccion in extracciones | reverse %}
+    <details class="disclosure ai-run">
+      <summary>
+        <span class="disclosure__chevron">{{ icon("chevron-right") }}</span>
+        <span class="ai-run__icon">{{ icon("cpu") }}</span>
+        <span class="ai-run__title">Extracción {{ n - loop.index0 }} · {{ extraccion.creado_en | hora_chile }}</span>
+        <span class="ai-run__model mono">{{ extraccion.proveedor }} · {{ extraccion.modelo }}</span>
+      </summary>
+      <div class="disclosure__body ai-run__body">
+        <p class="overline">Entrada enviada (seudonimizada)</p>
+        <pre class="pre pre--mono">{{ extraccion.entrada_seudonimizada }}</pre>
+      </div>
+    </details>
+    {%- endfor %}
+  </div>
+  {%- else %}
+  {{ empty_state("No hay extracciones registradas para este borrador.", icon="cpu", size="compact") }}
+  {%- endif %}
+</section>
+{%- endmacro %}
+
+{#- Por revisar: faltantes (obligatorio / esperado) y ambigüedades, cada uno enlazado a su
+    campo. Si no hay nada que revisar, la tarjeta se omite. -#}
+{% macro review_panel(filas, faltantes, ambiguedades, nombres) -%}
+{%- if faltantes or ambiguedades %}
+<section class="card review" aria-labelledby="t-revisar">
+  <h2 class="review__title" id="t-revisar">Por revisar</h2>
+  {%- if faltantes %}
+  <div class="review__group">
+    <p class="overline">Faltan</p>
+    <ul class="review__list review__list--missing">
+      {%- for falta in faltantes %}
+      {%- set ancla = CAMPOS_DEL_FALTANTE.get(falta.campo, [falta.campo])[0] %}
+      <li><a class="review-item review-item--{{ 'required' if falta.obligatorio else 'expected' }}" href="#f-{{ ancla }}">
+        {{- icon("circle-alert") }}<span class="review-item__text"><span class="sentence">{{ falta.descripcion }}</span></span>
+        <span class="review-item__tag">{{ "Obligatorio" if falta.obligatorio else "Esperado" }}</span></a></li>
+      {%- endfor %}
+    </ul>
+  </div>
+  {%- endif %}
+  {%- if ambiguedades %}
+  <div class="review__group">
+    <p class="overline">Ambigüedades</p>
+    <ul class="review__list">
+      {%- for duda in ambiguedades %}
+      {%- set fila = filas | selectattr("clave", "equalto", duda.campo) | first | default(none) %}
+      <li><a class="review-item review-item--ambiguous" href="#f-{{ duda.campo }}">
+        <span class="review-item__head">{{ icon("circle-help") }}<span>{{ fila.etiqueta if fila else duda.campo }}</span></span>
+        <span class="review-item__reason">{{ duda.motivo | con_nombres(nombres) }}</span></a></li>
+      {%- endfor %}
+    </ul>
+  </div>
+  {%- endif %}
+  <p class="review__note">Para completar datos, el profesional responde al último mensaje del bot desde la misma cuenta y canal. La web no edita campos.</p>
+</section>
+{%- endif %}
+{%- endmacro %}
+
+{#- Acciones: descartar (POST + CSRF + confirmación) mientras esté pendiente. El diálogo propio
+    (JS progresivo) lee los data-confirm-*; sin JS queda el confirm() nativo. -#}
+{% macro draft_actions(borrador, residente, profesional, puede_descartar, csrf) -%}
+{%- if puede_descartar or borrador.estado == "descartado" %}
+<section class="card actions" aria-labelledby="t-acciones">
+  <h2 class="review__title" id="t-acciones">Acciones</h2>
+  {%- if puede_descartar %}
+  <p class="actions__text">Si el borrador no corresponde, descártalo. Seguirá disponible para consulta como descartado.</p>
+  <form method="post" action="/borradores/{{ borrador.id }}/descartar" data-enviando="Descartando…"
+        data-confirm-title="¿Descartar el borrador #{{ borrador.id }}?"
+        data-confirm-body="{{ nombre_residente(residente) }} · {{ profesional.nombre }} · {{ (borrador.creado_en | hora_chile).split(' ')[0] }}. Seguirá visible como descartado y no podrá restaurarse desde la web."
+        data-confirm-label="Sí, descartar"
+        onsubmit="return confirm(this.dataset.confirmTitle + '\n\n' + this.dataset.confirmBody)">
+    {{ csrf_field(csrf) }}
+    {{ button("Descartar borrador", "danger", icon="trash-2", block=True, clase="actions__button") }}
+  </form>
+  {%- else %}
+  <p class="actions__text">No hay acciones disponibles para un borrador descartado.</p>
+  {%- endif %}
+</section>
+{%- endif %}
+{%- endmacro %}
+
+{#- Tabla de borradores (V03). Bajo 900 px cada fila pasa a tarjeta, sin perder columnas. -#}
+{% macro drafts_table(filas, ids_sin_actividad, titulo) -%}
+<div class="table-card drafts">
+  <table class="table table--hover drafts__table">
+    <caption class="visually-hidden">{{ titulo }}</caption>
+    <thead>
+      <tr><th scope="col">N.º</th><th scope="col">Creado</th><th scope="col">Residente</th><th scope="col">Profesional</th>
+          <th scope="col">Canal</th><th scope="col">Falta</th><th scope="col">Estado</th></tr>
+    </thead>
+    <tbody>
+    {%- for borrador, profesional, residente in filas %}
+      <tr>
+        <td class="drafts__id"><a href="/borradores/{{ borrador.id }}"><span class="visually-hidden">Borrador </span>#{{ borrador.id }}</a></td>
+        <td class="drafts__date" data-label="Creado">{{ borrador.creado_en | hora_chile }}</td>
+        <td class="drafts__resident">{% if residente %}{{ nombre_residente(residente) }}{% else %}<span class="missing">Sin identificar</span>{% endif %}</td>
+        <td class="drafts__pro" data-label="Profesional"><span class="drafts__pro-inner"><span>{{ profesional.nombre }}</span><span class="meta">{{ capitalizar(profesional.especialidad) }}</span></span></td>
+        <td class="drafts__channel" data-label="Canal">{{ channel_inline(borrador.canal) }}</td>
+        <td class="drafts__missing" data-label="Falta">
+          {%- if borrador.faltantes %}
+          <span class="chip-list">
+            {%- for falta in borrador.faltantes %}<span class="chip {{ 'chip--required' if falta.obligatorio else 'chip--expected' }}"><span class="sentence">{{ falta.descripcion }}</span><span class="visually-hidden"> ({{ "obligatorio" if falta.obligatorio else "esperado" }})</span></span>{% endfor -%}
+          </span>
+          {%- else %}<span class="text-secondary">—</span>{% endif -%}
+        </td>
+        <td class="drafts__status">{{ draft_status(borrador, borrador.id in ids_sin_actividad) }}</td>
+      </tr>
+    {%- endfor %}
+    </tbody>
+  </table>
+</div>
+{%- endmacro %}

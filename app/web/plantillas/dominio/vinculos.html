@@ -1,0 +1,135 @@
+{#- Componentes del dominio de mensajería (V02): panel del enlace generado, filas de profesional,
+    cuentas vinculadas y formulario de nuevo enlace. Las acciones siguen siendo los mismos POST. -#}
+{%- from "ui/iconos.html" import icon -%}
+{%- from "ui/etiquetas.html" import channel_name, channel_icon, channel_badge, capitalizar -%}
+{%- from "ui/botones.html" import button, link_button -%}
+{%- from "ui/formularios.html" import csrf_field, select -%}
+{%- from "ui/avisos.html" import alert -%}
+
+{#- Pasos por canal. Como la web no se entera del canje, el último paso pide actualizar. -#}
+{%- set PASOS = {
+  "telegram": [
+    "Desde el teléfono del profesional, escanea el código o abre el enlace.",
+    "En Telegram, pulsa “Iniciar”.",
+    "El bot confirma la vinculación en el chat. Si el código venció, también lo indica allí.",
+    "Pulsa “Actualizar vínculos” para ver la cuenta en esta página.",
+  ],
+  "whatsapp": [
+    "Desde el teléfono del profesional, escanea el código o abre el enlace.",
+    "WhatsApp abre un mensaje ya escrito: pídele que envíe el mensaje sin modificarlo.",
+    "El bot confirma la vinculación en el chat.",
+    "Pulsa “Actualizar vínculos” para ver la cuenta en esta página.",
+  ],
+} -%}
+
+{#- ConnectionPanel: resultado de "Generar enlace". Variantes: Telegram con QR, WhatsApp con QR y
+    Telegram sin enlace (comando /start de reserva). -#}
+{% macro connection_panel(enlace) -%}
+{%- set canal = channel_name(enlace.canal) %}
+{%- set fecha, hora = (enlace.expira_en | hora_chile).split(" ") %}
+<section class="card card--highlight connection{{ ' connection--sin-qr' if not enlace.qr }}" aria-labelledby="t-enlace">
+  {%- if enlace.qr %}
+  <div class="connection__qr">
+    <div class="qr" role="img" aria-label="Código QR del enlace de vinculación de {{ canal }} para {{ enlace.profesional.nombre }}">{{ enlace.qr | safe }}</div>
+    <p class="connection__hint">Escanéalo con el teléfono del profesional</p>
+  </div>
+  {%- endif %}
+  <div class="connection__head">
+    {{ channel_badge(enlace.canal) }}
+    <h2 id="t-enlace">{{ "Enlace de vinculación para" if enlace.url else "Código para" }} {{ enlace.profesional.nombre }}</h2>
+  </div>
+  <p class="connection__expiry connection__expiry--top">{{ icon("clock") }}Vence a las {{ hora }} · un solo uso</p>
+  {%- if enlace.url %}
+  {{ link_button("Abrir en " ~ canal, enlace.url, "primary", "external-link", "lg", block=True, external=True, clase="connection__open") }}
+  {%- if enlace.qr %}<p class="connection__note">Si el profesional usa otro teléfono, que escanee este código:</p>{% endif %}
+  <ol class="steps connection__steps">
+    {%- for paso in PASOS.get(enlace.canal, PASOS["telegram"]) %}
+    <li><span class="steps__n" aria-hidden="true">{{ loop.index }}</span><span>{{ paso }}</span></li>
+    {%- endfor %}
+  </ol>
+  <div class="connection__link">
+    <p class="overline">Enlace</p>
+    <a class="link-box" href="{{ enlace.url }}" target="_blank" rel="noopener noreferrer"><span>{{ enlace.url }}</span>{{ icon("external-link", 14) }}</a>
+  </div>
+  {%- else %}
+  <div class="connection__steps connection__fallback">
+    {% call alert("info", compact=True) -%}
+    No fue posible obtener el enlace del bot. El profesional puede abrir el bot del Hogar en Telegram y enviar este comando:
+    {%- endcall %}
+    <pre class="pre pre--command">/start {{ enlace.codigo }}</pre>
+  </div>
+  {%- endif %}
+  <div class="connection__foot">
+    <p class="connection__expiry">{{ icon("clock") }}Vence el {{ fecha }} a las {{ hora }} · un solo uso</p>
+    {{ link_button("Actualizar vínculos", "/vinculos", "neutral", "refresh-cw", clase="connection__refresh") }}
+  </div>
+</section>
+{%- endmacro %}
+
+{#- LinkedAccount: canal + fecha + revocar (POST con CSRF y confirmación que nombra canal,
+    profesional y fecha, porque la cuenta no tiene un identificador visible). -#}
+{% macro linked_account(vinculo, profesional, csrf) -%}
+{%- set canal = channel_name(vinculo.canal) %}
+{%- set fecha = vinculo.creado_en | hora_chile %}
+<div class="account">
+  <span class="account__info">
+    <span class="account__channel">{{ channel_icon(vinculo.canal) }}{{ canal }}</span>
+    <span class="account__date"><span class="only-wide">Vinculada el</span><span class="only-narrow">Desde</span> {{ fecha }}</span>
+  </span>
+  <form class="account__form" method="post" action="/vinculos/{{ vinculo.id }}/revocar" data-enviando="Revocando…"
+        data-confirm-title="¿Revocar la cuenta de {{ canal }} de {{ profesional.nombre }}?"
+        data-confirm-body="Vinculada el {{ fecha }}. Desde esa cuenta ya no se podrán enviar atenciones. Para volver a usarla habrá que generar un enlace nuevo."
+        data-confirm-label="Sí, revocar"
+        onsubmit="return confirm(this.dataset.confirmTitle + '\n\n' + this.dataset.confirmBody)">
+    {{ csrf_field(csrf) }}
+    {{ button("Revocar", "ghost-danger", icon="x", size="sm", aria_label="Revocar " ~ canal ~ " de " ~ profesional.nombre ~ ", vinculada el " ~ fecha, clase="account__revoke") }}
+  </form>
+</div>
+{%- endmacro %}
+
+{#- ChannelSelector + Generar enlace. Sin WhatsApp no se muestra un select de una sola opción:
+    el canal se indica en texto y el servidor usa Telegram por defecto. -#}
+{% macro new_link_form(profesional, whatsapp_habilitado, csrf) -%}
+<form class="new-link" method="post" action="/vinculos/codigo" data-enviando="Generando…">
+  {{ csrf_field(csrf) }}
+  <input type="hidden" name="profesional_id" value="{{ profesional.id }}">
+  {%- if whatsapp_habilitado %}
+  {{ select("canal", "Canal", [("whatsapp", "WhatsApp"), ("telegram", "Telegram")], "whatsapp", id="canal-" ~ profesional.id, inline=True) }}
+  {%- else %}
+  <span class="new-link__fixed">{{ channel_icon("telegram") }}Canal: Telegram</span>
+  {%- endif %}
+  {{ button("Generar enlace", "secondary", icon="qr-code", aria_label="Generar enlace para " ~ profesional.nombre, clase="new-link__button") }}
+</form>
+{%- endmacro %}
+
+{#- Tabla de profesionales (ProfessionalRow). Bajo 900 px cada fila pasa a tarjeta. -#}
+{% macro professionals_table(profesionales, vinculos, whatsapp_habilitado, enlace, csrf) -%}
+<div class="table-card pros">
+  <table class="table pros__table">
+    <caption class="visually-hidden">Profesionales y sus cuentas de mensajería vinculadas</caption>
+    <thead>
+      <tr><th scope="col">Profesional</th><th scope="col">Especialidad</th><th scope="col">Cuentas vinculadas</th><th scope="col">Nuevo enlace</th></tr>
+    </thead>
+    <tbody>
+    {%- for profesional in profesionales %}
+    {%- set generado = enlace and enlace.profesional.id == profesional.id %}
+      <tr{% if generado %} class="is-generated"{% endif %}>
+        <th scope="row" class="pros__name">{{ profesional.nombre }}</th>
+        <td class="pros__esp">{{ capitalizar(profesional.especialidad) }}</td>
+        <td class="pros__accounts">
+          {%- for vinculo in vinculos.get(profesional.id, []) %}
+          {{ linked_account(vinculo, profesional, csrf) }}
+          {%- else %}
+          <span class="pros__none">Sin cuentas vinculadas</span>
+          {%- endfor %}
+          {%- if generado %}
+          <span class="pros__generated">{{ icon("clock", 14) }}Enlace generado arriba · vence {{ (enlace.expira_en | hora_chile).split(" ")[1] }}</span>
+          {%- endif %}
+        </td>
+        <td class="pros__new">{{ new_link_form(profesional, whatsapp_habilitado, csrf) }}</td>
+      </tr>
+    {%- endfor %}
+    </tbody>
+  </table>
+</div>
+{%- endmacro %}

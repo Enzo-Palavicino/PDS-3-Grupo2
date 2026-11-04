@@ -1,0 +1,44 @@
+{#- Formularios: token CSRF, campos de texto y select con la misma métrica. -#}
+{%- from "ui/iconos.html" import icon -%}
+
+{#- Único lugar donde se escribe el token CSRF. Va en todo formulario POST. -#}
+{% macro csrf_field(token) -%}
+<input type="hidden" name="csrf" value="{{ token }}">
+{%- endmacro %}
+
+{#- Campo de texto o contraseña con label visible. size="lg": 44 px (48 en móvil), para login. -#}
+{% macro field(name, label, type="text", required=False, autocomplete=None, autofocus=False, value=None, error=None, help=None, id=None, size=None) -%}
+{%- set fid = id or "campo-" ~ name -%}
+<div class="field{{ ' field--lg' if size == 'lg' }}">
+  <label class="field__label" for="{{ fid }}">{{ label }}</label>
+  <input class="field__control" id="{{ fid }}" name="{{ name }}" type="{{ type }}"
+    {%- if required %} required{% endif %}
+    {%- if autocomplete %} autocomplete="{{ autocomplete }}"{% endif %}
+    {%- if autofocus %} autofocus{% endif %}
+    {%- if value is not none %} value="{{ value }}"{% endif %}
+    {%- if error %} aria-invalid="true" aria-describedby="{{ fid }}-error"{% elif help %} aria-describedby="{{ fid }}-help"{% endif %}>
+  {%- if help %}
+  <p class="field__help" id="{{ fid }}-help">{{ help }}</p>
+  {%- endif %}
+  {%- if error %}
+  <p class="field__error" id="{{ fid }}-error">{{ icon("circle-alert", 14) }}{{ error }}</p>
+  {%- endif %}
+</div>
+{%- endmacro %}
+
+{#- Select nativo con appearance:none y chevron propio. options: lista de (valor, texto).
+    inline=True: label al lado del control (fila de una tabla). -#}
+{% macro select(name, label, options, selected=None, id=None, inline=False) -%}
+{%- set fid = id or "campo-" ~ name -%}
+<div class="field field--select{{ ' field--inline' if inline }}">
+  <label class="field__label" for="{{ fid }}">{{ label }}</label>
+  <span class="select">
+    <select class="field__control" id="{{ fid }}" name="{{ name }}">
+      {%- for valor, texto in options %}
+      <option value="{{ valor }}"{% if valor == selected %} selected{% endif %}>{{ texto }}</option>
+      {%- endfor %}
+    </select>
+    {{- icon("chevron-down", 16, "select__chevron") -}}
+  </span>
+</div>
+{%- endmacro %}

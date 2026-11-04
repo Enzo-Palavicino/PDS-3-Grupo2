@@ -1,0 +1,44 @@
+{#- Badge, estado del borrador, canal y textos cortos. Los estados se comunican siempre con
+    palabra + icono + color. -#}
+{%- from "ui/iconos.html" import icon as icono -%}
+
+{#- tone: pending · discarded · inactive · info. -#}
+{% macro badge(text, tone="info", icon=None, size=None, clase="") -%}
+<span class="badge badge--{{ tone }}{{ ' badge--lg' if size == 'lg' }}{{ ' ' ~ clase if clase }}">
+  {%- if tone == "pending" %}<span class="badge__dot" aria-hidden="true"></span>{% elif icon %}{{ icono(icon, 12) }}{% endif -%}
+  {{ text }}</span>
+{%- endmacro %}
+
+{#- Fuente única del estado de un borrador, para el listado y el detalle. "Sin actividad" es una
+    marca adicional (borde punteado) que nunca reemplaza al estado. Conserva las clases
+    "etiqueta sin-actividad", que usan los tests. -#}
+{% macro draft_status(borrador, inactivo=False, size=None) -%}
+<span class="badge-group">
+  {%- if borrador.estado == "descartado" %}{{ badge("Descartado", "discarded", "x", size) }}
+  {%- else %}{{ badge("Pendiente", "pending", size=size) }}{% endif %}
+  {%- if inactivo %}{{ badge("Sin actividad", "inactive", "hourglass", size, clase="etiqueta sin-actividad") }}{% endif -%}
+</span>
+{%- endmacro %}
+
+{% macro channel_name(canal) -%}
+{{ {"telegram": "Telegram", "whatsapp": "WhatsApp"}.get(canal, canal | capitalize) }}
+{%- endmacro %}
+
+{#- WhatsApp = message-square, Telegram = send; nunca logotipos de marcas. -#}
+{% macro channel_icon(canal, tam=14) -%}
+{{ icono("message-square" if canal == "whatsapp" else "send", tam) }}
+{%- endmacro %}
+
+{% macro channel_badge(canal) -%}
+{{ badge(channel_name(canal), "info", "message-square" if canal == "whatsapp" else "send") }}
+{%- endmacro %}
+
+{#- Canal con icono y nombre, en línea (tablas y metadatos). -#}
+{% macro channel_inline(canal) -%}
+<span class="channel">{{ channel_icon(canal) }}{{ channel_name(canal) }}</span>
+{%- endmacro %}
+
+{#- Mayúscula inicial sin alterar el resto ("pediatría" → "Pediatría"). -#}
+{% macro capitalizar(texto) -%}
+{{ (texto or "")[:1] | upper }}{{ (texto or "")[1:] }}
+{%- endmacro %}

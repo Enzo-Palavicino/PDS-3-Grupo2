@@ -1,7 +1,24 @@
 {% extends "base.html" %}
+{%- from "ui/iconos.html" import icon -%}
+{%- from "ui/botones.html" import link_button -%}
+{#- Una plantilla para todos los errores HTTP. El mensaje viene del servidor; aquí solo se agrega
+    cómo seguir. Los textos no afirman que la sesión terminó. -#}
+{%- set ICONOS_ERROR = {403: "lock", 404: "file-search"} -%}
+{%- set AYUDA = {
+  403: "Si llegaste desde un enlace del bot, puede corresponder a otro profesional.",
+  404: "Revisa el enlace o vuelve al inicio.",
+} -%}
 {% block titulo %}Error {{ codigo }}{% endblock %}
+{% block clase_main %}page page--error{% endblock %}
 {% block contenido %}
-<h1>{{ titulo }}</h1>
-<p>{{ mensaje }}</p>
-<p><a href="/">Volver al inicio</a></p>
+<div class="error-page">
+  <span class="error-page__icon{{ ' error-page__icon--danger' if codigo not in ICONOS_ERROR }}">{{ icon(ICONOS_ERROR.get(codigo, "server-crash"), 22) }}</span>
+  <p class="error-page__code">Error {{ codigo }}</p>
+  <h1>{{ titulo }}</h1>
+  <p class="error-page__message">{{ mensaje }} {{ AYUDA.get(codigo, "Si se repite, avisa a la dirección del Hogar.") }}</p>
+  {{ link_button("Volver al inicio", "/", "primary", "house", "lg", clase="error-page__home") }}
+  {%- if codigo == 403 %}
+  <p class="error-page__note">“Inicio” te lleva a la sección de tu rol si tu sesión sigue activa, o al inicio de sesión si no.</p>
+  {%- endif %}
+</div>
 {% endblock %}
