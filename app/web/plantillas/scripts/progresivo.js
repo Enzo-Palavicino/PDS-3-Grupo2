@@ -15,6 +15,25 @@
     return formulario.querySelector('button[type="submit"], button:not([type])');
   }
 
+  // Recuerda, solo para la página siguiente, qué acción se envió (por ejemplo, "descartado"), para
+  // que el resultado se anime al llegar. sessionStorage puede no estar disponible: se ignora.
+  function recordarResultado(valor) {
+    try {
+      sessionStorage.setItem("resultado", JSON.stringify({ valor: valor, ruta: location.pathname }));
+    } catch (error) { /* sin almacenamiento, sin animación */ }
+  }
+
+  function mostrarResultado() {
+    var guardado = null;
+    try {
+      guardado = JSON.parse(sessionStorage.getItem("resultado") || "null");
+      sessionStorage.removeItem("resultado");
+    } catch (error) { return; }
+    var principal = document.getElementById("contenido");
+    // Solo si se volvió a la misma página (el 303 del servidor); si hubo un error, no se anima.
+    if (guardado && principal && guardado.ruta === location.pathname) principal.dataset.resultado = guardado.valor;
+  }
+
   function marcarEnviando(formulario) {
     var boton = botonDe(formulario);
     if (!boton || boton.getAttribute("aria-disabled") === "true") return;
@@ -22,6 +41,9 @@
     if (etiqueta && formulario.dataset.enviando) {
       boton.dataset.textoOriginal = etiqueta.innerHTML;
       etiqueta.textContent = formulario.dataset.enviando;
+      // El texto nuevo entra con un desenfoque breve: se lee como un solo botón que cambia,
+      // no como dos textos que se reemplazan.
+      etiqueta.classList.add("btn__label--cambio");
     }
     var icono = boton.querySelector(".icon");
     if (icono) icono.style.display = "none";
@@ -31,14 +53,21 @@
     boton.insertBefore(giro, boton.firstChild);
     boton.setAttribute("aria-disabled", "true");
     formulario.dataset.enviado = "1";
+    // Mientras viaja el POST, la cuenta que se revoca se atenúa (no desaparece: podría fallar).
+    var cuenta = formulario.closest(".account");
+    if (cuenta) cuenta.classList.add("account--saliendo");
+    if (formulario.dataset.resultado) recordarResultado(formulario.dataset.resultado);
   }
 
   function restaurar(formulario) {
     var boton = botonDe(formulario);
     delete formulario.dataset.enviado;
     delete formulario.dataset.confirmado;
+    var cuenta = formulario.closest(".account");
+    if (cuenta) cuenta.classList.remove("account--saliendo");
     if (!boton) return;
     var etiqueta = boton.querySelector(".btn__label");
+    if (etiqueta) etiqueta.classList.remove("btn__label--cambio");
     if (etiqueta && boton.dataset.textoOriginal !== undefined) etiqueta.innerHTML = boton.dataset.textoOriginal;
     var giro = boton.querySelector(".btn__spinner");
     if (giro) giro.remove();
@@ -107,4 +136,6 @@
     if (!evento.persisted) return;
     document.querySelectorAll("form[data-enviado]").forEach(restaurar);
   });
+
+  mostrarResultado();
 })();

@@ -57,12 +57,20 @@
 .btn--block { width: 100%; }
 /* Enviando (JS progresivo): sigue siendo el mismo botón, sin doble envío. */
 .btn[aria-disabled="true"] { cursor: progress; pointer-events: none; opacity: .85; }
+/* El spinner entra desde 0,9 con opacidad (nada aparece de la nada) y gira rápido: un giro
+   rápido hace que la espera se perciba más corta. Usa la propiedad "scale" para no pisar el
+   "transform" del giro. */
 .btn__spinner {
   flex: none; width: 14px; height: 14px; border-radius: 50%;
   border: 2px solid color-mix(in srgb, currentColor 40%, transparent); border-top-color: currentColor;
-  animation: girar 700ms linear infinite;
+  animation: girar 700ms linear infinite, aparecer-giro 150ms var(--ease-out);
 }
-@media (prefers-reduced-motion: reduce) { .btn__spinner { animation-duration: 1.6s; } }
+/* El texto en gerundio entra con un desenfoque de 2 px: el cambio se lee como un solo botón que
+   se transforma, no como dos textos superpuestos. */
+.btn__label--cambio { animation: enfocar 150ms ease; }
+@media (prefers-reduced-motion: reduce) {
+  .btn__spinner { animation: girar 1.6s linear infinite, aparecer 150ms var(--ease-out); }
+}
 @media (max-width: 600px) {
   .btn, .btn--sm { height: var(--control-h-touch); font-size: 1rem; }
   .btn--lg { height: 3rem; }
@@ -199,8 +207,16 @@
 .disclosure > summary::-webkit-details-marker { display: none; }
 .disclosure__chevron { display: flex; color: var(--color-primary); transition: transform var(--duration-base) var(--ease-standard); }
 .disclosure[open] > summary .disclosure__chevron { transform: rotate(90deg); }
-.disclosure__body { animation: aparecer var(--duration-base) var(--ease-out); }
-@media (prefers-reduced-motion: reduce) { .disclosure__chevron { transition: none; } }
+/* El contenido baja 4 px desde el summary al abrirse: el movimiento apunta hacia dónde se
+   despliega. Presionar la fila (que ocupa todo el ancho) solo cambia el fondo: escalar una fila
+   completa se ve torpe. */
+.disclosure > summary { transition: background-color var(--duration-fast) var(--ease-standard); }
+.disclosure > summary:active { background: var(--color-surface-subtle); }
+.disclosure__body { animation: aparecer-bajando var(--duration-base) var(--ease-out); }
+@media (prefers-reduced-motion: reduce) {
+  .disclosure__chevron { transition: none; }
+  .disclosure__body { animation-name: aparecer; }
+}
 
 /* PreText --------------------------------------------------------------------------------- */
 .pre {
@@ -275,4 +291,11 @@
 /* Animaciones compartidas ------------------------------------------------------------------ */
 @keyframes aparecer { from { opacity: 0; } }
 @keyframes aparecer-arriba { from { opacity: 0; transform: translateY(4px); } }
+@keyframes aparecer-bajando { from { opacity: 0; transform: translateY(-4px); } }
+@keyframes entrar { from { opacity: 0; transform: translateY(8px); } }
+@keyframes entrar-escala { from { opacity: 0; transform: scale(.96); } }
+@keyframes revelar { from { opacity: 0; transform: scale(.96); filter: blur(2px); } }
+@keyframes revelar-suave { from { opacity: 0; filter: blur(2px); } }
+@keyframes aparecer-giro { from { opacity: 0; scale: .9; } }
+@keyframes enfocar { from { opacity: .6; filter: blur(2px); } }
 @keyframes girar { to { transform: rotate(360deg); } }

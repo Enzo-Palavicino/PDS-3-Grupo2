@@ -6,6 +6,7 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .coverage
+.claude/
 htmlcov/
 
 # Variables de entorno: contienen tokens y claves. Nunca se suben (el repositorio es público).

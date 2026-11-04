@@ -211,7 +211,7 @@
   <h2 class="review__title" id="t-acciones">Acciones</h2>
   {%- if puede_descartar %}
   <p class="actions__text">Si el borrador no corresponde, descártalo. Seguirá disponible para consulta como descartado.</p>
-  <form method="post" action="/borradores/{{ borrador.id }}/descartar" data-enviando="Descartando…"
+  <form method="post" action="/borradores/{{ borrador.id }}/descartar" data-enviando="Descartando…" data-resultado="descartado"
         data-confirm-title="¿Descartar el borrador #{{ borrador.id }}?"
         data-confirm-body="{{ nombre_residente(residente) }} · {{ profesional.nombre }} · {{ (borrador.creado_en | hora_chile).split(' ')[0] }}. Seguirá visible como descartado y no podrá restaurarse desde la web."
         data-confirm-label="Sí, descartar"
