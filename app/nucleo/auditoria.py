@@ -23,6 +23,22 @@ class Accion(StrEnum):
     INICIO_SESION_FALLIDO = "inicio_sesion_fallido"
     BORRADOR_LEIDO = "borrador_leido"
     BORRADOR_DESCARTADO = "borrador_descartado"
+    # Ficha clínica
+    RESIDENTE_CREADO = "residente_creado"
+    RESIDENTE_EDITADO = "residente_editado"
+    RESIDENTE_EGRESADO = "residente_egresado"
+    PROFESIONAL_CREADO = "profesional_creado"
+    PROFESIONAL_DESACTIVADO = "profesional_desactivado"
+    FICHA_LEIDA = "ficha_leida"
+    ATENCION_CREADA = "atencion_creada"
+    ATENCION_EDITADA = "atencion_editada"
+    ATENCION_FIRMADA = "atencion_firmada"
+    ADJUNTO_SUBIDO = "adjunto_subido"
+    ADJUNTO_DESCARGADO = "adjunto_descargado"
+    DOCUMENTO_SUBIDO = "documento_subido"
+    DOCUMENTO_INCORPORADO = "documento_incorporado"
+    DOCUMENTO_DESCARTADO = "documento_descartado"
+    TRATAMIENTO_SUSPENDIDO = "tratamiento_suspendido"
 
 
 def registrar_evento(

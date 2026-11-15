@@ -26,6 +26,7 @@ from app.modelos import (
 )
 from app.nucleo.auditoria import Accion, registrar_evento
 from app.nucleo.borradores import sin_actividad
+from app.nucleo.campos import ETIQUETAS
 from app.web.autenticacion import SesionBD, exigir_rol, verificar_csrf
 from app.web.plantillas import pagina
 
@@ -34,24 +35,6 @@ router = APIRouter()
 LectorDeBorradores = Annotated[
     UsuarioWeb, Depends(exigir_rol(Rol.ENCARGADA_SALUD, Rol.PROFESIONAL))
 ]
-
-# Campos del Registro de Atención, en el orden en que se muestran.
-ETIQUETAS = {
-    "residente": "Residente",
-    "fecha_atencion": "Fecha de atención",
-    "hora_atencion": "Hora",
-    "lugar": "Lugar",
-    "especialidad": "Especialidad",
-    "motivo": "Motivo",
-    "diagnosticos": "Diagnósticos",
-    "evolucion_clinica": "Evolución clínica",
-    "observaciones": "Observaciones",
-    "indicaciones_farmacologicas": "Indicaciones farmacológicas",
-    "otras_indicaciones": "Otras indicaciones",
-    "examenes_solicitados": "Exámenes solicitados",
-    "proximo_control": "Próximo control",
-    "acompanante": "Acompañante",
-}
 
 
 @router.get("/borradores")
