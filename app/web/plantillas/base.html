@@ -28,7 +28,7 @@
       </span>
     </div>
     {% if usuario %}
-    {#- Cada rol tiene una sola sección; el servidor decide el acceso. -#}
+    {#- El menú orienta; el servidor verifica los permisos en cada ruta. -#}
     {%- set seccion = ("/vinculos", "Vínculos", "link") if usuario.rol == "directora" else ("/borradores", "Borradores", "file-text") %}
     {%- set ruta = request.url.path %}
     <nav class="app-nav" aria-label="Principal">
@@ -37,7 +37,18 @@
         {{- icon(seccion[2]) }}{{ seccion[1] -}}
       </a>
       {% if usuario.rol in ("directora", "encargada_salud") %}
-      <a class="app-nav__link" href="/residentes"{% if ruta.startswith("/residentes") %} aria-current="page"{% endif %}>Residentes</a>
+      <a class="app-nav__link" href="/residentes"{% if ruta == "/residentes" or ruta.endswith("/editar") or ruta == "/residentes/nuevo" %} aria-current="page"{% endif %}>Residentes</a>
+      {% endif %}
+      {% if usuario.rol == "directora" %}
+      <a class="app-nav__link" href="/profesionales"{% if ruta.startswith("/profesionales") %} aria-current="page"{% endif %}>Profesionales</a>
+      {% endif %}
+      {% if usuario.rol in ("encargada_salud", "profesional") %}
+      <a class="app-nav__link" href="/fichas"{% if ruta == "/fichas" or (ruta.startswith("/residentes/") and ruta.rsplit("/", 1)[-1].isdigit()) %} aria-current="page"{% endif %}>Fichas</a>
+      <a class="app-nav__link" href="/atenciones"{% if ruta.startswith("/atenciones") %} aria-current="page"{% endif %}>Atenciones</a>
+      <a class="app-nav__link" href="/adjuntos"{% if ruta.startswith("/adjuntos") %} aria-current="page"{% endif %}>Adjuntos</a>
+      {% endif %}
+      {% if usuario.rol == "encargada_salud" %}
+      <a class="app-nav__link" href="/digitalizacion"{% if ruta.startswith("/digitalizacion") %} aria-current="page"{% endif %}>Digitalización</a>
       {% endif %}
     </nav>
     <div class="app-user">
