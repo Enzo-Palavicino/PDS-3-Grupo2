@@ -8,13 +8,17 @@ Contrato del esqueleto (E1-01): las firmas no cambian sin avisar a quien las usa
 """
 
 import copy
+import hashlib
+import hmac
+import json
 import re
-from datetime import date
+from datetime import UTC, date
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.db import ahora
 from app.modelos import (
     Atencion,
     BorradorAtencion,
@@ -31,6 +35,7 @@ from app.modelos import (
 from app.nucleo import incorporacion
 from app.nucleo.auditoria import Accion, registrar_evento
 from app.nucleo.campos import CAMPOS_ATENCION, CAMPOS_LISTA
+from app.seguridad import verificar_password
 
 FECHA = re.compile(r"\d{4}-\d{2}-\d{2}")
 # Campos que completa el servicio aunque no vengan: el residente (con su código) y la
@@ -214,16 +219,76 @@ def firmar_atencion(
     - llama a incorporar_a_ficha;
     - audita atencion_firmada.
 
-    Lanza PasswordIncorrecta, AtencionFirmada o DatosIncompletos. Si algo falla, no queda nada
-    firmado.
+    Lanza PasswordIncorrecta, AtencionFirmada o DatosIncompletos, y ErrorDeAtencion si quien
+    firma no es el profesional autor. Si algo falla, no queda nada firmado.
     """
-    raise NotImplementedError
+    if atencion.estado == EstadoAtencion.FIRMADA:
+        raise AtencionFirmada("La atención ya está firmada.")
+    # La web ya lo revisa con permisos.puede_firmar; esta es una segunda barrera.
+    es_autor = (
+        usuario.rol == Rol.PROFESIONAL
+        and usuario.profesional_id is not None
+        and usuario.profesional_id == atencion.profesional_id
+    )
+    if not es_autor:
+        raise ErrorDeAtencion("Solo el profesional que hizo la atención puede firmarla.")
+    if not verificar_password(password, usuario.hash_password):
+        raise PasswordIncorrecta("La contraseña no es correcta.")
+    faltantes = faltantes_obligatorios(
+        atencion.residente_id,
+        atencion.campos,
+        atencion.fecha_atencion,
+        OrigenAtencion(atencion.origen),
+    )
+    if faltantes:
+        raise DatosIncompletos(faltantes)
+
+    # SAVEPOINT: si algo falla de aquí en adelante (por ejemplo, al incorporar los datos a la
+    # ficha), se deshace todo este bloque y la atención sigue en borrador.
+    with sesion.begin_nested():
+        atencion.estado = EstadoAtencion.FIRMADA
+        atencion.firmada_por = usuario.id
+        atencion.firmada_en = ahora()
+        atencion.hash_firma = calcular_hash(atencion)
+        if atencion.borrador_id is not None:
+            sesion.get(BorradorAtencion, atencion.borrador_id).estado = EstadoBorrador.CONFIRMADO
+        incorporar_a_ficha(sesion, atencion)
+        registrar_evento(
+            sesion,
+            Accion.ATENCION_FIRMADA,
+            actor_tipo=TipoActor.USUARIO,
+            actor_id=usuario.id,
+            entidad="atencion",
+            entidad_id=atencion.id,
+            detalle={"hash": atencion.hash_firma},
+        )
+    return atencion
 
 
 def verificar_integridad(atencion: Atencion) -> bool:
     """Recalcula el hash de una atención firmada y lo compara con el guardado al firmar. False si
     el contenido cambió después de la firma o si la atención no está firmada."""
-    raise NotImplementedError
+    if atencion.estado != EstadoAtencion.FIRMADA or not atencion.hash_firma:
+        return False
+    return hmac.compare_digest(calcular_hash(atencion), atencion.hash_firma)
+
+
+def calcular_hash(atencion: Atencion) -> str:
+    """SHA-256 de lo que se firma: quién y cuándo, el residente y todo el contenido de la
+    atención. Se calcula sobre un JSON con las claves ordenadas, así que el orden en que se
+    guardaron los campos no cambia el resultado."""
+    firmado = {
+        "residente_id": atencion.residente_id,
+        "profesional_id": atencion.profesional_id,
+        "origen": str(atencion.origen),
+        "fecha_atencion": atencion.fecha_atencion.isoformat() if atencion.fecha_atencion else None,
+        "campos": atencion.campos,
+        "corrige_a_id": atencion.corrige_a_id,
+        "firmada_por": atencion.firmada_por,
+        "firmada_en": atencion.firmada_en.astimezone(UTC).isoformat(),
+    }
+    texto = json.dumps(firmado, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(texto.encode()).hexdigest()
 
 
 def incorporar_a_ficha(sesion: Session, atencion: Atencion) -> None:
