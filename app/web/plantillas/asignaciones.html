@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% from "ui/formularios.html" import csrf_field %}
+{% from "ui/avisos.html" import alert %}
+{% from "ui/encabezados.html" import page_header %}
+{% block titulo %}Asignaciones{% endblock %}
+{% block contenido %}
+{{ page_header("Profesionales asignados", residente.codigo ~ " · " ~ residente.nombres ~ " " ~ residente.apellidos) }}
+<p><a href="/residentes">Volver a residentes</a></p>
+<p>La asignación permite al profesional acceder a la ficha y registrar atenciones. Retirarla quita ese permiso sin borrar los registros anteriores.</p>
+{% if exito %}{% call alert("success", role="status") %}{{ exito }}{% endcall %}{% endif %}
+<section class="card res-panel"><h2>Asignar profesional</h2>
+{% if disponibles %}<form method="post" action="/residentes/{{ residente.id }}/asignaciones">
+{{ csrf_field(csrf) }}<input type="hidden" name="accion" value="asignar">
+<div class="field"><label class="field__label" for="profesional">Profesional</label>
+<select class="field__control" name="profesional_id" id="profesional" required>
+{% for p in disponibles %}<option value="{{ p.id }}">{{ p.nombre }} · {{ p.especialidad }}</option>{% endfor %}</select></div>
+<div class="res-actions"><button class="btn btn--primary">Asignar</button></div></form>
+{% else %}<p>No hay otros profesionales activos disponibles.</p>{% endif %}</section>
+<div class="card res-scroll"><table class="res-table"><thead><tr><th scope="col">Profesional</th><th scope="col">Especialidad</th><th scope="col">Acción</th></tr></thead><tbody>
+{% for asignacion, p in asignados %}<tr><td>{{ p.nombre }}{% if not p.activo %} (desactivado, sin acceso){% endif %}</td><td>{{ p.especialidad }}</td><td>
+<form method="post" action="/residentes/{{ residente.id }}/asignaciones" data-confirm-title="¿Retirar la asignación?" data-confirm-body="El profesional perderá el acceso a esta ficha. Los registros anteriores se conservarán." data-confirm-label="Retirar" onsubmit="return confirm(this.dataset.confirmTitle)">
+{{ csrf_field(csrf) }}<input type="hidden" name="profesional_id" value="{{ p.id }}"><input type="hidden" name="accion" value="quitar"><button class="btn btn--ghost-danger">Quitar</button></form></td></tr>
+{% else %}<tr><td colspan="3">Sin profesionales asignados.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

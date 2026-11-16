@@ -6,3 +6,10 @@
 .res-table th, .res-table td { padding: var(--space-4); text-align: left; vertical-align: top; border-bottom: 1px solid var(--color-border); overflow-wrap: anywhere; }
 .res-table thead { background: var(--color-surface-subtle); }
 .res-table tbody tr:last-child > * { border-bottom: 0; }
+
+.res-asignaciones { margin-top: var(--space-6); padding: var(--space-4); border: 1px solid var(--color-border); border-radius: 8px; }
+.res-asignaciones legend { padding-inline: var(--space-2); font-weight: 600; }
+.res-asignacion { display: flex; align-items: baseline; gap: var(--space-2); padding-block: var(--space-2); }
+
+.res-profesional-selector { display: flex; gap: var(--space-3); align-items: end; margin-bottom: var(--space-3); flex-wrap: wrap; }
+.res-profesional-selector .field { flex: 1 1 240px; }
