@@ -36,6 +36,7 @@ from app.web import (
     borradores,
     digitalizacion,
     fichas,
+    firma,
     profesionales,
     residentes,
     vinculos,
@@ -155,6 +156,7 @@ def crear_app(config: Config | None = None) -> FastAPI:
     app.include_router(profesionales.router)
     app.include_router(fichas.router)
     app.include_router(atenciones.router)
+    app.include_router(firma.router)
     app.include_router(adjuntos.router)
     app.include_router(digitalizacion.router)
     app.include_router(webhook_telegram.router)
