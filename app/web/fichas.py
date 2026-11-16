@@ -2,10 +2,11 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.modelos import Rol, UsuarioWeb
-from app.web.autenticacion import exigir_rol
+from app.nucleo.permisos import puede_ver_ficha
+from app.web.autenticacion import SesionBD, exigir_rol
 from app.web.plantillas import pagina
 
 router = APIRouter()
@@ -23,7 +24,9 @@ def listar(request: Request, usuario: PersonalClinico):
 
 # El convertidor int evita que esta ruta capture /residentes/nuevo, que pertenece a E2-01.
 @router.get("/residentes/{residente_id:int}")
-def ver(residente_id: int, request: Request, usuario: PersonalClinico):
+def ver(residente_id: int, request: Request, sesion: SesionBD, usuario: PersonalClinico):
+    if not puede_ver_ficha(sesion, usuario, residente_id):
+        raise HTTPException(403, "No tienes acceso a esta ficha.")
     return pagina(
         request, "pendiente.html", usuario=usuario, titulo="Ficha", status_code=501
     )
