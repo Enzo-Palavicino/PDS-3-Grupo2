@@ -22,6 +22,7 @@ from app.modelos import (
     VinculoCanal,
 )
 from app.nucleo.mensajes import registrar_mensaje_entrante
+from tests.test_migraciones import insertar_datos_previos_a_la_0004
 
 URL = os.environ.get("TEST_POSTGRES_URL")
 
@@ -130,3 +131,22 @@ def test_guarda_ids_de_whatsapp_largos(
     with fabrica_postgres.begin() as sesion:
         sesion.execute(delete(BorradorAtencion))
         sesion.execute(delete(MensajeEntrante))
+
+
+def test_la_0004_deja_activos_los_residentes_que_ya_existian(configurar_alembic):
+    # Como en el servidor de Render: ya hay residentes y profesionales cuando se aplica la 0004.
+    configuracion = configurar_alembic(URL)
+    command.downgrade(configuracion, "base")
+    command.upgrade(configuracion, "0003")
+    motor = crear_motor(URL)
+    try:
+        insertar_datos_previos_a_la_0004(motor)
+        command.upgrade(configuracion, "head")
+        with motor.connect() as conexion:
+            assert conexion.execute(text("SELECT codigo, estado FROM residentes")).one() == (
+                "RES-01",
+                "activo",
+            )
+    finally:
+        motor.dispose()
+        command.downgrade(configuracion, "base")

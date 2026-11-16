@@ -2,7 +2,7 @@
 
 import os
 import shutil
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import pytest
@@ -11,7 +11,7 @@ from alembic.config import Config as ConfigAlembic
 
 from app.canales.base import MensajeNormalizado
 from app.db import crear_fabrica_de_sesiones, crear_motor
-from app.modelos import Profesional
+from app.modelos import Nivel, Profesional, Residente
 
 # Los tests nunca se conectan a Telegram ni a OpenAI, aunque el .env local esté configurado
 # para hacerlo: las variables de entorno tienen prioridad sobre .env.
@@ -81,6 +81,20 @@ def profesional(sesion) -> Profesional:
     sesion.add(profesional)
     sesion.commit()
     return profesional
+
+
+@pytest.fixture
+def residente(sesion) -> Residente:
+    residente = Residente(
+        codigo="RES-01",
+        nombres="Tomás",
+        apellidos="Rivas",
+        fecha_nacimiento=date(2023, 7, 14),
+        nivel=Nivel.HETEROGENEO,
+    )
+    sesion.add(residente)
+    sesion.commit()
+    return residente
 
 
 @pytest.fixture
