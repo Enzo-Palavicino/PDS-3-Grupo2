@@ -13,6 +13,7 @@ from app.modelos import EventoAuditoria, TipoActor
 
 
 class Accion(StrEnum):
+    CONTRASENA_CAMBIADA = "contrasena_cambiada"
     CODIGO_GENERADO = "codigo_generado"
     CODIGO_RECHAZADO = "codigo_rechazado"  # código inexistente, usado o vencido
     VINCULO_CREADO = "vinculo_creado"

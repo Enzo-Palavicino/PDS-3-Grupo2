@@ -14,6 +14,7 @@
 {% include "estilos/componentes.css" %}
 {% include "estilos/dominio.css" %}
 {% include "estilos/residentes.css" %}
+{% include "estilos/profesionales.css" %}
 </style>
 </head>
 <body>
@@ -50,6 +51,7 @@
       {% if usuario.rol == "encargada_salud" %}
       <a class="app-nav__link" href="/digitalizacion"{% if ruta.startswith("/digitalizacion") %} aria-current="page"{% endif %}>Digitalización</a>
       {% endif %}
+      <a class="app-nav__link" href="/cuenta/password"{% if ruta == "/cuenta/password" %} aria-current="page"{% endif %}>Mi contraseña</a>
     </nav>
     <div class="app-user">
       <span class="app-user__name">{{ usuario.usuario }}</span>

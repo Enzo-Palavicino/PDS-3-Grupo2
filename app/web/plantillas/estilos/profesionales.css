@@ -1,0 +1,22 @@
+/* Administración y cuenta: usa los mismos colores y controles que el resto de la web. */
+.admin-form { padding: var(--space-6); }
+.admin-form h2 { margin-bottom: var(--space-4); }
+.admin-form__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: var(--space-4); }
+.admin-form__submit { margin-top: var(--space-4); }
+.admin-table-scroll { overflow-x: auto; }
+.admin-table { width: 100%; border-collapse: collapse; }
+.admin-table th, .admin-table td { padding: var(--space-4); text-align: left; vertical-align: top; border-bottom: 1px solid var(--color-border); overflow-wrap: anywhere; }
+.admin-table thead { background: var(--color-surface-subtle); }
+.admin-table tbody tr:last-child > * { border-bottom: 0; }
+.password-form { max-width: 520px; padding: var(--space-6); display: grid; gap: var(--space-4); }
+/* El menú ahora tiene varias entradas: conservar espacio y desplazamiento en pantallas chicas. */
+.app-nav { gap: var(--space-4); min-width: 0; overflow-x: auto; }
+.app-nav__link { white-space: nowrap; }
+@media (max-width: 700px) {
+  .app-nav { grid-column: 1 / -1; }
+  .app-user { display: none; }
+}
+
+.admin-filters { display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: end; margin-block: var(--space-4); }
+.admin-filters > .field { flex: 1 1 180px; }
+.admin-filters__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
