@@ -29,7 +29,17 @@ from app.nucleo.procesamiento import Contexto
 from app.nucleo.worker import Worker
 from app.proveedores.llm import crear_proveedor_llm
 from app.proveedores.stt import crear_proveedor_stt
-from app.web import autenticacion, borradores, vinculos
+from app.web import (
+    adjuntos,
+    atenciones,
+    autenticacion,
+    borradores,
+    digitalizacion,
+    fichas,
+    profesionales,
+    residentes,
+    vinculos,
+)
 from app.web.autenticacion import SesionRequerida
 from app.web.plantillas import pagina
 
@@ -141,6 +151,12 @@ def crear_app(config: Config | None = None) -> FastAPI:
     app.include_router(autenticacion.router)
     app.include_router(vinculos.router)
     app.include_router(borradores.router)
+    app.include_router(residentes.router)
+    app.include_router(profesionales.router)
+    app.include_router(fichas.router)
+    app.include_router(atenciones.router)
+    app.include_router(adjuntos.router)
+    app.include_router(digitalizacion.router)
     app.include_router(webhook_telegram.router)
     app.include_router(webhook_whatsapp.router)
 
