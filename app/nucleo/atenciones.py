@@ -13,6 +13,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.modelos import Atencion, OrigenAtencion, UsuarioWeb
+from app.nucleo import incorporacion
 
 
 class ErrorDeAtencion(Exception):
@@ -102,6 +103,6 @@ def incorporar_a_ficha(sesion: Session, atencion: Atencion) -> None:
     antecedentes (alergias, vacunas, hospitalizaciones) y mediciones (peso y talla).
 
     La llaman firmar_atencion y la incorporación de un documento histórico (E4-04). Si la
-    atención ya se incorporó, no hace nada.
+    atención ya se incorporó, no hace nada. No hace commit. Detalle en app/nucleo/incorporacion.py.
     """
-    raise NotImplementedError
+    incorporacion.incorporar(sesion, atencion)
