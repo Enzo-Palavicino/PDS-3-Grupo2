@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% from "ui/formularios.html" import field, select, csrf_field %}
+{% from "ui/encabezados.html" import page_header %}
+{% from "ui/avisos.html" import alert %}
+{% block titulo %}{{ "Editar residente" if residente else "Registrar residente" }}{% endblock %}
+{% block contenido %}
+{{ page_header("Editar residente · " ~ residente.codigo if residente else "Registrar residente", "Datos administrativos.") }}
+<p><a href="/residentes">Volver a residentes</a></p>
+{% if error %}{% call alert("danger", role="alert") %}{{ error }}{% endcall %}{% endif %}
+{% if duplicados %}{% call alert("warning", role="alert") %}
+Ya existe un residente con el mismo nombre completo y fecha de nacimiento. Revisa su ficha antes de crear otro registro:
+<ul>{% for otro in duplicados %}<li><a href="/residentes/{{ otro.id }}/editar">{{ otro.codigo }} · {{ otro.nombres }} {{ otro.apellidos }}</a> ({{ otro.estado }}).{% if otro.estado == 'egresado' %} Puedes registrar su reingreso en la misma ficha.{% endif %}</li>{% endfor %}</ul>
+{% endcall %}{% endif %}
+<form class="card res-panel" method="post" action="{{ '/residentes/' ~ residente.id ~ '/editar' if residente else '/residentes/nuevo' }}" data-enviando="Guardando…">
+{{ csrf_field(csrf) }}
+<div class="res-grid">
+{{ field("nombres", "Nombres", required=True, value=valores.get("nombres", "")) }}
+{{ field("apellidos", "Apellidos", required=True, value=valores.get("apellidos", "")) }}
+{{ field("apodo", "Apodo (opcional)", value=valores.get("apodo", "")) }}
+{{ field("fecha_nacimiento", "Fecha de nacimiento", type="date", required=True, value=valores.get("fecha_nacimiento", "")) }}
+{{ select("nivel", "Nivel", [("", "Selecciona un nivel")] + niveles, selected=valores.get("nivel", "")) }}
+{{ field("fecha_ingreso", "Fecha de ingreso inicial", type="date", required=True, value=valores.get("fecha_ingreso", "")) }}
+</div>
+{% if duplicados %}<p><label><input type="checkbox" name="confirmar_duplicado" value="true" required> Revisé las coincidencias y confirmo que corresponde guardar estos datos.</label></p>{% endif %}
+<div class="res-actions"><button class="btn btn--primary">{{ "Guardar cambios" if residente else "Crear residente" }}</button><a class="btn btn--neutral" href="/residentes">Cancelar</a></div>
+</form>
+{% if residente %}
+<section class="card res-panel" aria-labelledby="estado-residente"><h2 id="estado-residente">{{ "Registrar egreso" if residente.estado == "activo" else "Registrar reingreso" }}</h2>
+<p>Estado actual: {{ residente.estado }}.{% if residente.fecha_egreso %} Último egreso: {{ residente.fecha_egreso }}.{% endif %} Se conservarán el código, el ingreso inicial y todos los registros anteriores.</p>
+<form method="post" action="/residentes/{{ residente.id }}/estado" data-enviando="Guardando…"
+ data-confirm-title="¿Confirmar el cambio de estado?" data-confirm-body="Se conservará el historial del residente." data-confirm-label="Confirmar" onsubmit="return confirm(this.dataset.confirmTitle)">
+{{ csrf_field(csrf) }}<input type="hidden" name="accion" value="{{ 'egresar' if residente.estado == 'activo' else 'reingresar' }}">
+{{ field("fecha", "Fecha de egreso" if residente.estado == "activo" else "Fecha de reingreso", type="date", required=True, value=hoy) }}
+<div class="res-actions"><button class="btn btn--neutral">{{ "Registrar egreso" if residente.estado == "activo" else "Reactivar la misma ficha" }}</button></div>
+</form></section>
+{% endif %}
+{% endblock %}

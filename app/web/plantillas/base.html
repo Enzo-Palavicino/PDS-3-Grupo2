@@ -13,6 +13,7 @@
 {% include "estilos/base.css" %}
 {% include "estilos/componentes.css" %}
 {% include "estilos/dominio.css" %}
+{% include "estilos/residentes.css" %}
 </style>
 </head>
 <body>
@@ -35,6 +36,9 @@
          {%- if ruta == seccion[0] %} aria-current="page"{% elif ruta.startswith(seccion[0] ~ "/") %} aria-current="true"{% endif %}>
         {{- icon(seccion[2]) }}{{ seccion[1] -}}
       </a>
+      {% if usuario.rol in ("directora", "encargada_salud") %}
+      <a class="app-nav__link" href="/residentes"{% if ruta.startswith("/residentes") %} aria-current="page"{% endif %}>Residentes</a>
+      {% endif %}
     </nav>
     <div class="app-user">
       <span class="app-user__name">{{ usuario.usuario }}</span>

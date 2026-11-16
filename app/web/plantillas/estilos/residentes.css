@@ -1,0 +1,8 @@
+.res-panel { padding: var(--space-6); }
+.res-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: var(--space-4); align-items: end; }
+.res-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-4); }
+.res-scroll { overflow-x: auto; }
+.res-table { width: 100%; border-collapse: collapse; }
+.res-table th, .res-table td { padding: var(--space-4); text-align: left; vertical-align: top; border-bottom: 1px solid var(--color-border); overflow-wrap: anywhere; }
+.res-table thead { background: var(--color-surface-subtle); }
+.res-table tbody tr:last-child > * { border-bottom: 0; }
