@@ -4,7 +4,7 @@ from datetime import date
 import pytest
 from sqlalchemy import func, select
 
-from app.modelos import Atencion, EstadoAtencion, EventoAuditoria, Residente
+from app.modelos import Asignacion, Atencion, EstadoAtencion, EventoAuditoria, Residente
 from app.nucleo.borradores import armar_borrador
 from app.nucleo.mensajes import registrar_mensaje_entrante
 from app.proveedores.llm.fake import ProveedorLLMFake
@@ -205,6 +205,9 @@ def test_nuevo_residente_se_seudonimiza_en_extraccion_real(
     entrar("directora")
     assert crear(cliente, csrf).status_code == 200
     pid = id_profesional("pediatra")
+    nuevo = sesion.scalar(select(Residente).where(Residente.codigo == "RES-05"))
+    sesion.add(Asignacion(residente_id=nuevo.id, profesional_id=pid))
+    sesion.commit()
     mensaje = registrar_mensaje_entrante(
         sesion,
         crear_mensaje(texto="Atendí a Luciana Prueba por tos. Luchi está bien."),
