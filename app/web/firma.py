@@ -2,10 +2,20 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import RedirectResponse, Response
+from sqlalchemy.orm import Session
 
-from app.modelos import Profesional, Rol, UsuarioWeb
+from app.modelos import (
+    Atencion,
+    EstadoAtencion,
+    Profesional,
+    Residente,
+    Rol,
+    UsuarioWeb,
+)
+from app.nucleo.atenciones import AtencionFirmada, ErrorDeAtencion, firmar_atencion
+from app.nucleo.permisos import puede_firmar
 from app.nucleo.timbres import (
     TAMANO_MAXIMO_BYTES,
     TimbreNoValido,
@@ -13,6 +23,7 @@ from app.nucleo.timbres import (
     timbre_de,
 )
 from app.web.autenticacion import SesionBD, exigir_rol, usuario_actual, verificar_csrf
+from app.web.borradores import filas_de_campos
 from app.web.plantillas import pagina
 
 router = APIRouter()
@@ -68,4 +79,65 @@ def imagen_del_timbre(profesional_id: int, sesion: SesionBD, usuario: UsuarioAct
             # El navegador no adivina otro tipo de contenido que el declarado.
             "X-Content-Type-Options": "nosniff",
         },
+    )
+
+
+@router.get("/atenciones/{atencion_id:int}/firmar")
+def pantalla_de_firma(
+    request: Request, atencion_id: int, sesion: SesionBD, usuario: UsuarioProfesional
+):
+    atencion = _atencion_por_firmar(sesion, atencion_id, usuario)
+    return _pagina_de_firma(request, sesion, atencion, usuario)
+
+
+@router.post("/atenciones/{atencion_id:int}/firmar", dependencies=[Depends(verificar_csrf)])
+def firmar(
+    request: Request,
+    atencion_id: int,
+    sesion: SesionBD,
+    usuario: UsuarioProfesional,
+    password: Annotated[str, Form()] = "",
+):
+    atencion = _atencion_por_firmar(sesion, atencion_id, usuario)
+    try:
+        firmar_atencion(sesion, atencion, usuario, password)
+    except AtencionFirmada:
+        raise
+    except ErrorDeAtencion as error:
+        # Contraseña incorrecta o datos incompletos: no se firmó nada.
+        return _pagina_de_firma(request, sesion, atencion, usuario, str(error), status_code=400)
+    sesion.commit()
+    return RedirectResponse(f"/residentes/{atencion.residente_id}", status_code=303)
+
+
+def _atencion_por_firmar(sesion: Session, atencion_id: int, usuario: UsuarioWeb) -> Atencion:
+    atencion = sesion.get(Atencion, atencion_id)
+    if atencion is None:
+        raise HTTPException(404, "La atención no existe.")
+    if atencion.estado == EstadoAtencion.FIRMADA:
+        raise AtencionFirmada("La atención ya está firmada.")
+    if not puede_firmar(usuario, atencion):
+        raise HTTPException(403, "Solo el profesional que hizo la atención puede firmarla.")
+    return atencion
+
+
+def _pagina_de_firma(
+    request: Request,
+    sesion: Session,
+    atencion: Atencion,
+    usuario: UsuarioWeb,
+    error: str | None = None,
+    status_code: int = 200,
+):
+    residente = sesion.get(Residente, atencion.residente_id)
+    return pagina(
+        request,
+        "firmar.html",
+        status_code=status_code,
+        usuario=usuario,
+        atencion=atencion,
+        residente=residente,
+        campos=filas_de_campos(atencion.campos),
+        nombres={residente.codigo: f"{residente.nombres} {residente.apellidos}"},
+        error=error,
     )

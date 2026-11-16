@@ -3,10 +3,11 @@
 {%- from "ui/botones.html" import link_button -%}
 {#- Una plantilla para todos los errores HTTP. El mensaje viene del servidor; aquí solo se agrega
     cómo seguir. Los textos no afirman que la sesión terminó. -#}
-{%- set ICONOS_ERROR = {403: "lock", 404: "file-search"} -%}
+{%- set ICONOS_ERROR = {403: "lock", 404: "file-search", 409: "lock"} -%}
 {%- set AYUDA = {
   403: "Si llegaste desde un enlace del bot, puede corresponder a otro profesional.",
   404: "Revisa el enlace o vuelve al inicio.",
+  409: "Una atención firmada no se modifica: se corrige agregando una adenda.",
 } -%}
 {% block titulo %}Error {{ codigo }}{% endblock %}
 {% block clase_main %}page page--error{% endblock %}

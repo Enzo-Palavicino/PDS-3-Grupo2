@@ -1,0 +1,18 @@
+{#- Firma de una atención: timbre, fecha y hora, hash abreviado y verificación de integridad.
+    Lo usa la ficha (E1-02). integra es el resultado de atenciones.verificar_integridad. -#}
+{%- from "ui/avisos.html" import alert -%}
+
+{% macro firma_de_atencion(atencion, integra) -%}
+<div class="firma">
+  <img src="/profesionales/{{ atencion.profesional_id }}/timbre" alt="Timbre del profesional que firmó" width="200">
+  <dl class="meta-list">
+    <div><dt>Firmada</dt><dd>{{ atencion.firmada_en | hora_chile }}</dd></div>
+    <div><dt>Hash</dt><dd><span class="code" title="SHA-256: {{ atencion.hash_firma }}">{{ atencion.hash_firma[:12] }}</span></dd></div>
+  </dl>
+  {%- if integra %}
+  {% call alert("success", compact=True) %}Integridad verificada: el contenido no cambió desde la firma.{% endcall %}
+  {%- else %}
+  {% call alert("danger", role="alert", compact=True) %}El contenido no coincide con lo que se firmó.{% endcall %}
+  {%- endif %}
+</div>
+{%- endmacro %}

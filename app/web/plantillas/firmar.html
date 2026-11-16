@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{%- from "ui/formularios.html" import csrf_field, field -%}
+{%- from "ui/encabezados.html" import page_header, section_header -%}
+{%- from "ui/avisos.html" import alert -%}
+{% block titulo %}Firmar atención{% endblock %}
+{% block contenido %}
+{{ page_header("Firmar atención", "Revisa los datos. Al firmar, la atención queda en la ficha de " ~ residente.nombres ~ " " ~ residente.apellidos ~ " y ya no se puede modificar: solo se corrige con una adenda.") }}
+{% if error %}{% call alert("danger", role="alert") %}{{ error }}{% endcall %}{% endif %}
+
+<section class="section" aria-labelledby="t-resumen">
+  {{ section_header("Resumen", id="t-resumen") }}
+  <dl class="card meta-list">
+    {%- for fila in campos if fila.valor %}
+    <div><dt>{{ fila.etiqueta }}</dt><dd>{{ fila.valor | con_nombres(nombres) }}</dd></div>
+    {%- endfor %}
+  </dl>
+</section>
+
+<section class="section" aria-labelledby="t-firma">
+  {{ section_header("Tu firma", id="t-firma") }}
+  <div class="card password-form">
+    <img src="/profesionales/{{ atencion.profesional_id }}/timbre" alt="Tu timbre" width="200">
+    <p class="meta"><a href="/cuenta/timbre">Cambiar mi timbre</a></p>
+    <form method="post" action="/atenciones/{{ atencion.id }}/firmar" data-enviando="Firmando…">
+      {{ csrf_field(csrf) }}
+      {{ field("password", "Tu contraseña", type="password", required=True, autocomplete="current-password", help="La misma con la que inicias sesión. Confirma que eres tú quien firma.") }}
+      <button class="btn btn--primary">Firmar atención</button>
+    </form>
+  </div>
+</section>
+{% endblock %}
