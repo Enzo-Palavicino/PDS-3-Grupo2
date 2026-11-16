@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% from "ui/formularios.html" import csrf_field, field, select %}
+{% from "ui/encabezados.html" import page_header %}
+{% from "ui/avisos.html" import alert %}
+{% block titulo %}Profesionales{% endblock %}
+{% block contenido %}
+{{ page_header("Profesionales", "Administra a los profesionales y sus accesos. Desactivarlos conserva los registros anteriores y revoca sus cuentas web y de mensajería.") }}
+{% if exito %}{% call alert("success", role="status") %}Profesional y usuario creados exitosamente.{% endcall %}{% endif %}
+{% if error %}{% call alert("danger") %}{{ error }}{% endcall %}{% endif %}
+<section class="card admin-form" aria-labelledby="crear-profesional">
+  <h2 id="crear-profesional">Crear profesional</h2>
+  <form method="post" action="/profesionales" data-enviando="Guardando…">
+    {{ csrf_field(csrf) }}
+    <div class="admin-form__grid">
+      {{ field("nombre", "Nombre completo", required=True, value=valores.get("nombre", "")) }}
+      {{ field("especialidad", "Especialidad", required=True, value=valores.get("especialidad", "")) }}
+      {{ field("registro", "Registro profesional (opcional)", value=valores.get("registro", "")) }}
+      {{ field("cuenta", "Usuario web", required=True, autocomplete="off", value=valores.get("cuenta", ""), help="Sin espacios.") }}
+      {{ field("password", "Contraseña inicial", type="password", required=True, autocomplete="new-password", help="Entre 10 y 128 caracteres. El profesional puede cambiarla desde Mi contraseña posteriormente.") }}
+    </div>
+    <button class="btn btn--primary admin-form__submit">Crear profesional y usuario</button>
+  </form>
+</section>
+<section aria-labelledby="lista-profesionales">
+<h2 id="lista-profesionales">Profesionales registrados</h2>
+<form class="admin-filters" method="get" action="/profesionales">
+  {{ field("buscar", "Buscar por nombre", type="search", value=buscar, id="filtro-nombre") }}
+  {{ select("especialidad", "Especialidad", opciones_especialidad, selected=especialidad, id="filtro-especialidad") }}
+  {{ select("estado", "Estado", [("", "Todos"), ("activo", "Activos"), ("desactivado", "Desactivados")], selected=estado, id="filtro-estado") }}
+  <div class="admin-filters__actions"><button class="btn btn--primary">Filtrar</button><a class="btn btn--neutral" href="/profesionales">Limpiar</a></div>
+</form>
+<p role="status">{{ profesionales | length }} de {{ total }} profesionales</p>
+<div class="card admin-table-scroll">
+<table class="admin-table">
+  <thead><tr><th scope="col">Profesional</th><th scope="col">Especialidad / registro</th><th scope="col">Estado</th><th scope="col">Vínculos activos</th><th scope="col">Acciones</th></tr></thead>
+  <tbody>
+  {% for profesional in profesionales %}
+    <tr>
+      <th scope="row">{{ profesional.nombre }}</th>
+      <td>{{ profesional.especialidad }}<br>{{ profesional.registro or "Sin registro informado" }}</td>
+      <td>{{ "Activo" if profesional.activo else "Desactivado" }}</td>
+      <td>{% for canal in vinculos.get(profesional.id, []) | sort %}{{ "WhatsApp" if canal == "whatsapp" else "Telegram" }}{% if not loop.last %}, {% endif %}{% else %}Sin vínculos activos{% endfor %}</td>
+      <td>{% if profesional.activo %}
+        <form method="post" action="/profesionales/{{ profesional.id }}/desactivar"
+              data-confirm-title="¿Desactivar a {{ profesional.nombre }}?"
+              data-confirm-body="Perderá el acceso web, WhatsApp y Telegram. Su historial se conservará."
+              data-confirm-label="Sí, desactivar"
+              onsubmit="return confirm(this.dataset.confirmTitle + '\n' + this.dataset.confirmBody)">
+          {{ csrf_field(csrf) }}<button class="btn btn--ghost-danger">Desactivar</button>
+        </form>
+      {% else %}Historial conservado{% endif %}</td>
+    </tr>
+  {% else %}<tr><td colspan="5">{% if total %}No hay profesionales que coincidan con los filtros. Prueba otros criterios o pulsa Limpiar.{% else %}Aún no hay profesionales registrados.{% endif %}</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+<p><a href="/vinculos">Gestionar vínculos de mensajería</a></p>
+</section>
+{% endblock %}
