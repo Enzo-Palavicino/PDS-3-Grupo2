@@ -136,6 +136,10 @@ def _destino(siguiente: str, usuario: UsuarioWeb) -> str:
     """A dónde ir después de iniciar sesión: a la página pedida si es de la sección del rol (las
     demás le responderían 403, como un enlace de borrador abierto por la directora) y, si no, a
     su página de inicio."""
+    if usuario.rol in (Rol.DIRECTORA, Rol.ENCARGADA_SALUD) and (
+        siguiente == "/residentes" or siguiente.startswith(("/residentes/", "/residentes?"))
+    ):
+        return siguiente
     inicio = PAGINA_INICIAL[usuario.rol]
     # Como inicio empieza con "/" y una letra, esto también impide redirigir a otro sitio.
     destinos = [inicio, "/cuenta/password"]

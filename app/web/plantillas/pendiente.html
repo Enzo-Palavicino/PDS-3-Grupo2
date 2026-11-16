@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% from "ui/encabezados.html" import page_header %}
+{% from "ui/avisos.html" import empty_state %}
+{% block titulo %}{{ titulo }}{% endblock %}
+{% block contenido %}
+{{ page_header(titulo) }}
+{{ empty_state("Disponible próximamente", "Estamos preparando esta sección.") }}
+{% endblock %}
