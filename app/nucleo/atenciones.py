@@ -28,6 +28,7 @@ from app.modelos import (
     TipoActor,
     UsuarioWeb,
 )
+from app.nucleo import incorporacion
 from app.nucleo.auditoria import Accion, registrar_evento
 from app.nucleo.campos import CAMPOS_ATENCION, CAMPOS_LISTA
 
@@ -230,9 +231,9 @@ def incorporar_a_ficha(sesion: Session, atencion: Atencion) -> None:
     antecedentes (alergias, vacunas, hospitalizaciones) y mediciones (peso y talla).
 
     La llaman firmar_atencion y la incorporación de un documento histórico (E4-04). Si la
-    atención ya se incorporó, no hace nada.
+    atención ya se incorporó, no hace nada. No hace commit. Detalle en app/nucleo/incorporacion.py.
     """
-    raise NotImplementedError
+    incorporacion.incorporar(sesion, atencion)
 
 
 def _preparar(
