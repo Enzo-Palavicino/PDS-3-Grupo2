@@ -10,3 +10,5 @@
 .atencion-form textarea.field__control { height: auto; min-height: 4.5rem; padding-block: var(--space-2); resize: vertical; }
 .atencion-confirmacion { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-4); border-radius: 8px; background: var(--color-surface-subtle); }
 .atencion-confirmacion input { margin-top: .25rem; width: 1.125rem; height: 1.125rem; flex: none; }
+.atencion-origen { display: flex; align-items: flex-start; gap: var(--space-2); margin: var(--space-2) 0 0; font-size: .8125rem; color: var(--color-text-secondary); }
+.atencion-origen .icon { flex: none; margin-top: .125rem; }

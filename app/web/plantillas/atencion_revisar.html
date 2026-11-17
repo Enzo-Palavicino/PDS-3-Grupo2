@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{%- from "ui/encabezados.html" import page_header, back_link, section_header -%}
+{%- from "ui/avisos.html" import alert -%}
+{%- from "ui/formularios.html" import csrf_field -%}
+{%- from "ui/botones.html" import link_button -%}
+{%- from "ui/etiquetas.html" import badge -%}
+{%- from "dominio/formulario_atencion.html" import campos_de_atencion -%}
+{%- from "dominio/borradores.html" import source_messages, ai_history -%}
+{#- Revisar un borrador de la IA (modo "revision") o editar una atención en borrador (modo
+    "edicion"), E3-02. El formulario es el de E3-01; al lado, los mensajes de origen. -#}
+{%- set nombre = (residente.nombres ~ " " ~ residente.apellidos) if residente else None -%}
+{%- set titulo = "Revisar y completar el borrador #" ~ borrador.id if modo == "revision" else "Atención #" ~ atencion.id ~ " en borrador" -%}
+{% block titulo %}{{ titulo }}{% endblock %}
+{% block clase_main %}page page--detail{% endblock %}
+{% block contenido %}
+{%- if borrador %}{{ back_link("/borradores/" ~ borrador.id, "Borrador #" ~ borrador.id) }}
+{%- else %}{{ back_link("/residentes/" ~ residente.id, "Ficha de " ~ nombre) }}{% endif %}
+{% call page_header(titulo, "Corrige y completa los datos. Se guarda en borrador: no es una atención registrada hasta que su profesional la firma.") %}
+{{ badge("Sin firmar", "pending") }}
+{% endcall %}
+
+{%- if exito %}{% call alert("success", role="status") %}{{ exito }}{% endcall %}{% endif %}
+{%- if errores %}
+{% call alert("danger", title="No se guardaron los cambios", role="alert") %}
+{%- for error in errores %}{{ error }}{% if not loop.last %}<br>{% endif %}{% endfor %}
+{%- endcall %}
+{%- endif %}
+
+<div class="detail">
+  <div class="detail__main">
+    {%- if elegir_residente %}
+    <form class="card atencion-form" method="get" action="{{ accion }}">
+      <fieldset class="atencion-bloque">
+        <legend>Residente</legend>
+        {% call alert("warning", compact=True) -%}
+        {%- set dudas = ambiguedades | selectattr("campo", "equalto", "residente") | map(attribute="motivo") | list -%}
+        La IA no pudo identificar al residente{% if dudas %}: {{ dudas | join("; ") }}{% endif %}. Elígelo de la lista.
+        {%- endcall %}
+        <div class="field">
+          <label class="field__label" for="campo-residente">Residente</label>
+          <select class="field__control" id="campo-residente" name="residente_id" required>
+            <option value="">Selecciona un residente</option>
+            {%- for r in candidatos %}
+            <option value="{{ r.id }}"{% if residente and r.id == residente.id %} selected{% endif %}>{{ r.nombres }} {{ r.apellidos }} · {{ r.codigo }}{% if r.codigo in mencionados %} (mencionado){% endif %}</option>
+            {%- endfor %}
+          </select>
+        </div>
+        <p class="actions"><button class="btn btn--neutral">Elegir residente</button></p>
+      </fieldset>
+    </form>
+    {%- endif %}
+
+    {%- if residente %}
+    <form class="card atencion-form" method="post" action="{{ accion }}" data-enviando="Guardando…">
+      {{ csrf_field(csrf) }}
+      {%- if modo == "revision" %}<input type="hidden" name="residente_id" value="{{ residente.id }}">{% endif %}
+      {{ campos_de_atencion(campos, faltantes) }}
+      {%- if modo == "revision" %}
+      <div class="atencion-confirmacion">
+        <input id="confirmo-identidad" name="confirmo_identidad" type="checkbox" value="{{ residente.id }}" required>
+        <label for="confirmo-identidad">Confirmo que la atención es de <strong>{{ nombre }}</strong>, {{ edad }} <span class="code">{{ residente.codigo }}</span>.</label>
+      </div>
+      {%- else %}
+      <p class="meta">Residente: <strong>{{ nombre }}</strong>, {{ edad }} <span class="code">{{ residente.codigo }}</span>.</p>
+      {%- endif %}
+      <p class="actions">
+        <button class="btn btn--primary">{{ "Guardar en borrador" if modo == "revision" else "Guardar cambios" }}</button>
+        {%- if puede_firmar %}{{ link_button("Firmar", "/atenciones/" ~ atencion.id ~ "/firmar", "secondary") }}{% endif %}
+      </p>
+    </form>
+    {%- endif %}
+    <script>{% include "scripts/formulario_atencion.js" %}</script>
+  </div>
+
+  <div class="detail__aside">
+    <section class="card review" aria-labelledby="por-completar">
+      <h2 class="review__title" id="por-completar">Por completar</h2>
+      {%- if por_completar %}
+      <ul class="review__list">
+        {%- for falta in por_completar %}
+        <li>{{ badge("Obligatorio" if falta.obligatorio else "Esperado", "pending" if falta.obligatorio else "info") }} {{ falta.descripcion | capitalize }}</li>
+        {%- endfor %}
+      </ul>
+      {%- else %}
+      <p class="meta">No falta nada.</p>
+      {%- endif %}
+      {%- if campos_editados %}
+      <h3>Cambiados a mano</h3>
+      <p class="meta">Respecto de lo que extrajo la IA: {% for c in campos_editados %}{{ etiquetas.get(c, c) }}{% if not loop.last %}, {% endif %}{% endfor %}.</p>
+      {%- endif %}
+    </section>
+    {%- if borrador %}
+    {{ source_messages(mensajes) }}
+    {{ ai_history(extracciones) }}
+    {%- endif %}
+  </div>
+</div>
+{% endblock %}

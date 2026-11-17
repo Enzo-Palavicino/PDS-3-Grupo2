@@ -12,6 +12,14 @@
 {{- (campos.get(clave) or []) | map(attribute="valor") | select | join("\n") -}}
 {%- endmacro %}
 
+{#- Fragmento de origen de un dato que extrajo la IA (vacío si se escribió a mano). -#}
+{% macro origen(dato) -%}
+{%- set fragmentos = (dato if dato is sequence and dato is not string and dato is not mapping else [dato]) | select | map(attribute="fragmento") | select | list -%}
+{%- for fragmento in fragmentos %}
+<p class="atencion-origen">{{ icon("quote", 14) }}<span><span class="visually-hidden">Fragmento de origen: </span>«{{ fragmento | con_nombres(nombres or {}) }}»</span></p>
+{%- endfor %}
+{%- endmacro %}
+
 {% macro texto(nombre, etiqueta, campos, tipo="text", requerido=False, error=False, ayuda=None, maximo=None) -%}
 <div class="field">
   <label class="field__label" for="campo-{{ nombre }}">{{ etiqueta }}{% if requerido %} <span class="meta">(obligatorio)</span>{% endif %}</label>
@@ -19,15 +27,17 @@
     {%- if requerido %} required{% endif %}{% if maximo %} maxlength="{{ maximo }}"{% endif %}
     {%- if error %} aria-invalid="true"{% endif %}{% if ayuda %} aria-describedby="campo-{{ nombre }}-ayuda"{% endif %}>
   {%- if ayuda %}<p class="field__help" id="campo-{{ nombre }}-ayuda">{{ ayuda }}</p>{% endif %}
+  {{- origen(campos.get(nombre)) }}
 </div>
 {%- endmacro %}
 
-{% macro area(nombre, etiqueta, contenido, error=False, ayuda=None, filas=3) -%}
+{% macro area(nombre, etiqueta, contenido, error=False, ayuda=None, filas=3, dato=None) -%}
 <div class="field">
   <label class="field__label" for="campo-{{ nombre }}">{{ etiqueta }}</label>
   <textarea class="field__control" id="campo-{{ nombre }}" name="{{ nombre }}" rows="{{ filas }}"
     {%- if error %} aria-invalid="true"{% endif %}{% if ayuda %} aria-describedby="campo-{{ nombre }}-ayuda"{% endif %}>{{ contenido }}</textarea>
   {%- if ayuda %}<p class="field__help" id="campo-{{ nombre }}-ayuda">{{ ayuda }}</p>{% endif %}
+  {{- origen(dato) }}
 </div>
 {%- endmacro %}
 
@@ -47,6 +57,7 @@
     </div>
     {%- endfor %}
   </div>
+  {{- origen(i) }}
 </fieldset>
 {%- endmacro %}
 
@@ -65,9 +76,9 @@
   <legend>{{ icon("stethoscope") }} Motivo y evaluación</legend>
   <p class="field__help">Indica al menos el motivo o un diagnóstico.</p>
   {{ texto("motivo", "Motivo de la consulta", campos, error=falta_motivo) }}
-  {{ area("diagnosticos", "Diagnósticos", lineas(campos, "diagnosticos"), error=falta_motivo, ayuda="Uno por línea.") }}
-  {{ area("evolucion_clinica", "Evolución clínica", valor(campos, "evolucion_clinica"), filas=4) }}
-  {{ area("observaciones", "Observaciones", valor(campos, "observaciones")) }}
+  {{ area("diagnosticos", "Diagnósticos", lineas(campos, "diagnosticos"), error=falta_motivo, ayuda="Uno por línea.", dato=campos.get("diagnosticos")) }}
+  {{ area("evolucion_clinica", "Evolución clínica", valor(campos, "evolucion_clinica"), filas=4, dato=campos.get("evolucion_clinica")) }}
+  {{ area("observaciones", "Observaciones", valor(campos, "observaciones"), dato=campos.get("observaciones")) }}
 </fieldset>
 
 <fieldset class="atencion-bloque">
@@ -80,8 +91,8 @@
   </div>
   <template data-plantilla-indicacion>{{ fila_de_indicacion(none, "__N__") }}</template>
   <p><button type="button" class="btn btn--neutral" data-agregar-indicacion hidden>{{ icon("pill") }}<span class="btn__label">Agregar indicación</span></button></p>
-  {{ area("otras_indicaciones", "Otras indicaciones", lineas(campos, "otras_indicaciones"), ayuda="Una por línea.") }}
-  {{ area("examenes_solicitados", "Exámenes solicitados", lineas(campos, "examenes_solicitados"), ayuda="Uno por línea.") }}
+  {{ area("otras_indicaciones", "Otras indicaciones", lineas(campos, "otras_indicaciones"), ayuda="Una por línea.", dato=campos.get("otras_indicaciones")) }}
+  {{ area("examenes_solicitados", "Exámenes solicitados", lineas(campos, "examenes_solicitados"), ayuda="Uno por línea.", dato=campos.get("examenes_solicitados")) }}
 </fieldset>
 
 <fieldset class="atencion-bloque">
@@ -106,5 +117,7 @@
       <input class="field__control" id="campo-acompanante_cargo" name="acompanante_cargo" type="text" value="{{ acompanante.get('cargo') or '' }}">
     </div>
   </div>
+  {{- origen(campos.get("proximo_control")) }}
+  {{- origen(campos.get("acompanante")) }}
 </fieldset>
 {%- endmacro %}
