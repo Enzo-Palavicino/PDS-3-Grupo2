@@ -144,6 +144,30 @@ def test_responder_al_bot_completa_el_mismo_borrador(
 # Cuándo se crea un borrador nuevo
 
 
+@pytest.mark.parametrize("pregunta", ["", " ¿Cuándo será su próximo control?"])
+def test_los_antecedentes_del_mensaje_quedan_en_el_borrador(
+    sesion, contexto, guardar_mensaje, pregunta
+):
+    antecedentes = {
+        "alergias": [{"valor": "Látex", "fragmento": "alergia al látex"}],
+        "mediciones": {"peso_kg": 9.8, "talla_cm": None, "fragmento": "peso 9,8 kg"},
+    }
+    contexto.llm = ProveedorLLMFake([json.dumps(antecedentes)])
+
+    procesar(
+        sesion,
+        guardar_mensaje(texto="Emilia Soto: alergia al látex, peso 9,8 kg." + pregunta),
+        contexto,
+    )
+
+    borrador = unico_borrador(sesion)
+    assert borrador is not None
+    assert borrador.residente_id == 2
+    for nombre, dato in antecedentes.items():
+        assert borrador.campos[nombre] == dato
+    assert borrador.ambiguedades == []
+
+
 def test_responder_a_un_borrador_descartado_crea_uno_nuevo(sesion, contexto, guardar_mensaje):
     procesar(sesion, guardar_mensaje(id_externo="55667788:412", texto="Atendí a Tomás."), contexto)
     borrador = unico_borrador(sesion)

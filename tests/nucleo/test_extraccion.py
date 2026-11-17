@@ -101,6 +101,19 @@ def test_el_esquema_cumple_el_modo_estricto():
     assert "especialidad" not in ESQUEMA["properties"]
 
 
+def test_el_esquema_incluye_antecedentes_y_mediciones_con_fragmento():
+    for nombre in ("alergias", "vacunas", "hospitalizaciones"):
+        assert ESQUEMA["properties"][nombre] == {
+            "type": "array", "items": {"$ref": "#/$defs/Campo"}
+        }
+    mediciones = ESQUEMA["$defs"]["Mediciones"]
+    assert set(mediciones["required"]) == {"peso_kg", "talla_cm", "fragmento"}
+    for nombre in ("peso_kg", "talla_cm"):
+        assert mediciones["properties"][nombre]["anyOf"] == [
+            {"exclusiveMinimum": 0, "type": "number"}, {"type": "null"}
+        ]
+
+
 # Validación de la respuesta
 
 
@@ -118,6 +131,84 @@ def test_conserva_los_datos_respaldados_por_el_texto(residentes):
     assert registro.ambiguedades == []
     assert resultado.salida == RESPUESTA_COMPLETA
     assert (resultado.proveedor, resultado.modelo) == ("fake", "fake")
+
+
+def test_los_registros_anteriores_no_necesitan_antecedentes(residentes):
+    registro = extraer(GUION_COMPLETO, residentes, RESPUESTA_COMPLETA).registro
+
+    assert registro.alergias == registro.vacunas == registro.hospitalizaciones == []
+    assert registro.mediciones is None
+
+
+def test_extrae_antecedentes_y_mediciones_con_sus_fragmentos(residentes):
+    texto = (
+        "Emilia Soto: alergia al látex. Peso 9,8 kg y talla 74 cm. "
+        "Vacuna influenza aplicada. Hospitalización por neumonía en julio de 2026."
+    )
+    antecedentes = {
+        "alergias": [{"valor": "Látex", "fragmento": "alergia al látex"}],
+        "mediciones": {"peso_kg": 9.8, "talla_cm": 74, "fragmento": "Peso 9,8 kg y talla 74 cm"},
+        "vacunas": [{"valor": "Influenza", "fragmento": "Vacuna influenza aplicada"}],
+        "hospitalizaciones": [{
+            "valor": "Neumonía en julio de 2026",
+            "fragmento": "Hospitalización por neumonía en julio de 2026",
+        }],
+    }
+
+    resultado = extraer(texto, residentes, antecedentes)
+
+    assert resultado.registro.model_dump(include=set(antecedentes)) == antecedentes
+    assert resultado.registro.ambiguedades == []
+
+
+@pytest.mark.parametrize("nombre", ["alergias", "vacunas", "hospitalizaciones", "mediciones"])
+def test_descarta_antecedentes_sin_fragmento_respaldado(residentes, nombre):
+    dato = (
+        {"peso_kg": 9.8, "fragmento": "pesa 9,8 kg"}
+        if nombre == "mediciones"
+        else [{"valor": "Inventado", "fragmento": "no aparece en el mensaje"}]
+    )
+
+    resultado = extraer("Control de Emilia Soto.", residentes, {nombre: dato})
+
+    assert not getattr(resultado.registro, nombre)
+    assert (nombre, SIN_RESPALDO) in motivos(resultado)
+
+
+@pytest.mark.parametrize("nombre,valor", [("peso_kg", 9.8), ("talla_cm", 74)])
+def test_una_medicion_no_inventa_la_otra(residentes, nombre, valor):
+    resultado = extraer(
+        "Emilia Soto, medición de hoy", residentes,
+        {"mediciones": {nombre: valor, "fragmento": "medición de hoy"}},
+    )
+    mediciones = resultado.registro.mediciones.model_dump(exclude_none=True)
+
+    assert mediciones == {nombre: valor, "fragmento": "medición de hoy"}
+
+
+def test_las_mediciones_vacias_se_descartan(residentes):
+    resultado = extraer(
+        "Emilia Soto", residentes,
+        {"mediciones": {"peso_kg": None, "talla_cm": None, "fragmento": None}},
+    )
+
+    assert resultado.registro.mediciones is None
+    assert resultado.registro.ambiguedades == []
+
+
+@pytest.mark.parametrize("valor", [0, -1, True, float("inf"), float("nan"), "desconocido"])
+def test_reintenta_una_medicion_que_no_es_un_numero_positivo_finito(residentes, valor):
+    llm = ProveedorLLMFake([
+        json.dumps({"mediciones": {"peso_kg": valor, "fragmento": "Peso 9,8 kg"}}),
+        json.dumps({"mediciones": {"peso_kg": 9.8, "fragmento": "Peso 9,8 kg"}}),
+    ])
+
+    resultado = extraer_registro(
+        "Emilia Soto. Peso 9,8 kg", residentes, "pediatría", REFERENCIA, llm
+    )
+
+    assert len(llm.entradas) == 2
+    assert resultado.registro.mediciones.peso_kg == 9.8
 
 
 def test_descarta_los_datos_cuyo_fragmento_no_esta_en_el_texto(residentes):

@@ -25,6 +25,7 @@ from app.modelos import (
     Transcripcion,
 )
 from app.nucleo import textos
+from app.nucleo.campos import ETIQUETAS_ANTECEDENTES
 from app.nucleo.extraccion import RegistroExtraido, extraer_registro
 from app.nucleo.permisos import SinAsignacion, profesional_asignado
 from app.nucleo.seudonimizacion import seudonimizar
@@ -42,6 +43,7 @@ CAMPOS_CLINICOS = (
     "otras_indicaciones",
     "examenes_solicitados",
     "proximo_control",
+    *ETIQUETAS_ANTECEDENTES,
 )
 
 
