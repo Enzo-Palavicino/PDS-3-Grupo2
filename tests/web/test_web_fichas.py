@@ -315,3 +315,9 @@ def test_desde_residentes_la_encargada_abre_la_ficha(cliente, entrar, emilia):
 )
 def test_la_edad_se_muestra_en_meses_hasta_los_dos_anios(nacimiento, texto):
     assert edad(nacimiento, date(2026, 11, 17)) == texto
+
+
+def test_el_historial_cuenta_en_singular_y_plural(cliente, entrar, sesion, emilia, firmada):
+    entrar("pediatra")
+
+    assert "1 firmada<" in seccion(cliente.get(f"/residentes/{emilia.id}").text, "historial")

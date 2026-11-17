@@ -47,7 +47,7 @@
     <div><dt>Nivel</dt><dd>{{ residente.nivel.replace("_", " ") | capitalize }}</dd></div>
     <div><dt>Estado</dt><dd>{{ capitalizar(residente.estado) }}</dd></div>
   </dl>
-  <p class="actions">
+  <p class="ficha-acciones">
     {%- if puede_registrar %}{{ link_button("Nueva atención", "/atenciones/nueva?residente_id=" ~ residente.id, "primary", icon="stethoscope") }}{% endif %}
     {%- if puede_digitalizar %}{{ link_button("Digitalizar documento", "/digitalizacion?residente_id=" ~ residente.id, "secondary", icon="scan-text") }}{% endif %}
   </p>
@@ -64,7 +64,7 @@
       <h3>Diagnósticos</h3>
       {{ lista_de_antecedentes(resumen.diagnosticos, "Sin diagnósticos crónicos registrados.") }}
     </div>
-    <div>
+    <div class="ficha-resumen__ancho">
       <h3>Tratamientos activos</h3>
       {{ lista_de_tratamientos(tratamientos, puede_suspender, csrf) }}
     </div>
@@ -104,7 +104,7 @@
 </section>
 
 <section class="section" aria-labelledby="historial">
-  {{ section_header("Historial de atenciones", (atenciones | length) ~ " firmadas", id="historial") }}
+  {{ section_header("Historial de atenciones", (atenciones | length) ~ (" firmada" if atenciones | length == 1 else " firmadas"), id="historial") }}
   {%- for item in atenciones %}
   {%- set a = item.atencion %}
   <article class="card ficha-atencion" id="atencion-{{ a.id }}">
