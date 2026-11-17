@@ -24,6 +24,7 @@ from app.canales.whatsapp.cliente import ClienteKapso
 from app.config import Config, obtener_config
 from app.db import crear_fabrica_de_sesiones, crear_motor, esquema_creado
 from app.logs import configurar_logs
+from app.nucleo.atenciones import AtencionFirmada
 from app.nucleo.ingesta import enviar_respuestas, ingerir
 from app.nucleo.procesamiento import Contexto
 from app.nucleo.worker import Worker
@@ -36,6 +37,7 @@ from app.web import (
     borradores,
     digitalizacion,
     fichas,
+    firma,
     profesionales,
     residentes,
     vinculos,
@@ -155,6 +157,7 @@ def crear_app(config: Config | None = None) -> FastAPI:
     app.include_router(profesionales.router)
     app.include_router(fichas.router)
     app.include_router(atenciones.router)
+    app.include_router(firma.router)
     app.include_router(adjuntos.router)
     app.include_router(digitalizacion.router)
     app.include_router(webhook_telegram.router)
@@ -164,6 +167,19 @@ def crear_app(config: Config | None = None) -> FastAPI:
     async def ir_al_inicio_de_sesion(request: Request, error: SesionRequerida):
         return RedirectResponse(
             f"/login?siguiente={quote(error.siguiente)}", status_code=303
+        )
+
+    @app.exception_handler(AtencionFirmada)
+    async def atencion_firmada(request: Request, error: AtencionFirmada):
+        # Una atención firmada no se modifica (Ley 20.584, art. 12): cualquier ruta que lo
+        # intente responde 409, aunque no capture el error.
+        return pagina(
+            request,
+            "error.html",
+            status_code=409,
+            codigo=409,
+            titulo="Atención firmada",
+            mensaje=str(error),
         )
 
     @app.exception_handler(StarletteHTTPException)

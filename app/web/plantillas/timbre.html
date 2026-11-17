@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% from "ui/formularios.html" import csrf_field %}
+{% from "ui/encabezados.html" import page_header %}
+{% from "ui/avisos.html" import alert %}
+{% block titulo %}Mi timbre{% endblock %}
+{% block contenido %}
+{{ page_header("Mi timbre", "Acompaña tu firma en cada atención. Si no subes uno, se usa uno generado con tu nombre, especialidad y registro.") }}
+{% if error %}{% call alert("danger", role="alert") %}{{ error }}{% endcall %}{% endif %}
+{% if request.query_params.get("guardado") %}{% call alert("success", role="status") %}Timbre guardado.{% endcall %}{% endif %}
+<div class="card password-form">
+  <p><strong>Timbre actual</strong>{% if not profesional.timbre_mime %} (generado){% endif %}</p>
+  <img src="/profesionales/{{ profesional.id }}/timbre" alt="Timbre de {{ profesional.nombre }}" width="260">
+  <form method="post" action="/cuenta/timbre" enctype="multipart/form-data" data-enviando="Subiendo…">
+    {{ csrf_field(csrf) }}
+    <p>
+      <label for="archivo">Subir una imagen de mi timbre</label><br>
+      <input id="archivo" name="archivo" type="file" accept="image/png,image/jpeg" required>
+    </p>
+    <p class="meta">PNG o JPG, de hasta 1 MB.</p>
+    <button class="btn btn--primary">Guardar timbre</button>
+  </form>
+</div>
+{% endblock %}

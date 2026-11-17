@@ -40,6 +40,7 @@ class Accion(StrEnum):
     DOCUMENTO_INCORPORADO = "documento_incorporado"
     DOCUMENTO_DESCARTADO = "documento_descartado"
     TRATAMIENTO_SUSPENDIDO = "tratamiento_suspendido"
+    TIMBRE_SUBIDO = "timbre_subido"
 
 
 def registrar_evento(

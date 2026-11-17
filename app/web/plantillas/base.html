@@ -52,6 +52,9 @@
       <a class="app-nav__link" href="/digitalizacion"{% if ruta.startswith("/digitalizacion") %} aria-current="page"{% endif %}>Digitalización</a>
       {% endif %}
       <a class="app-nav__link" href="/cuenta/password"{% if ruta == "/cuenta/password" %} aria-current="page"{% endif %}>Mi contraseña</a>
+      {% if usuario.rol == "profesional" %}
+      <a class="app-nav__link" href="/cuenta/timbre"{% if ruta == "/cuenta/timbre" %} aria-current="page"{% endif %}>Mi timbre</a>
+      {% endif %}
     </nav>
     <div class="app-user">
       <span class="app-user__name">{{ usuario.usuario }}</span>
