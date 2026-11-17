@@ -18,13 +18,15 @@ def datos(sesion):
     return {u.usuario: u for u in sesion.scalars(select(UsuarioWeb))}
 
 
-@pytest.mark.parametrize('nombre,residente,permiso', [
-    ('pediatra', 1, True), ('pediatra', 3, False), ('nutricionista', 2, True),
-    ('nutricionista', 1, False), ('encargada_salud', 4, True), ('directora', 1, False),
+@pytest.mark.parametrize('nombre,residente,lectura,registro', [
+    ('pediatra', 1, True, True), ('pediatra', 3, False, False),
+    ('nutricionista', 2, True, True), ('nutricionista', 1, False, False),
+    # La encargada de salud ve todas las fichas, pero solo los profesionales registran (E3-01).
+    ('encargada_salud', 4, True, False), ('directora', 1, False, False),
 ])
-def test_lectura_y_registro(sesion, datos, nombre, residente, permiso):
-    assert puede_ver_ficha(sesion, datos[nombre], residente) is permiso
-    assert puede_registrar_atencion(sesion, datos[nombre], residente) is permiso
+def test_lectura_y_registro(sesion, datos, nombre, residente, lectura, registro):
+    assert puede_ver_ficha(sesion, datos[nombre], residente) is lectura
+    assert puede_registrar_atencion(sesion, datos[nombre], residente) is registro
 
 
 def test_edicion_firma_retiro_e_inactividad(sesion, datos):

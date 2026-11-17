@@ -41,6 +41,7 @@ from app.web import (
     firma,
     profesionales,
     residentes,
+    revision,
     tratamientos,
     vinculos,
 )
@@ -164,6 +165,7 @@ def crear_app(config: Config | None = None) -> FastAPI:
     app.include_router(profesionales.router)
     app.include_router(fichas.router)
     app.include_router(atenciones.router)
+    app.include_router(revision.router)
     app.include_router(firma.router)
     app.include_router(tratamientos.router)
     app.include_router(adjuntos.router)

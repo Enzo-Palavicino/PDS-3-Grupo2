@@ -1,0 +1,14 @@
+/* Formulario del Registro de Atención (E3-01, reutilizado en E3-02). */
+.atencion-form { padding: var(--space-6); margin-top: var(--space-6); }
+.atencion-form [hidden] { display: none !important; }
+.atencion-bloque { margin: 0 0 var(--space-6); padding: var(--space-4); border: 1px solid var(--color-border); border-radius: 8px; }
+.atencion-bloque > legend { display: inline-flex; align-items: center; gap: var(--space-2); padding-inline: var(--space-2); font-weight: 600; }
+.atencion-bloque > .field + .field { margin-top: var(--space-4); }
+.atencion-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: var(--space-4); }
+.atencion-indicacion { margin: 0 0 var(--space-4); padding: var(--space-3) var(--space-4); border: 1px dashed var(--color-border); border-radius: 8px; }
+.atencion-indicacion > legend { padding-inline: var(--space-2); font-size: .875rem; }
+.atencion-form textarea.field__control { height: auto; min-height: 4.5rem; padding-block: var(--space-2); resize: vertical; }
+.atencion-confirmacion { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-4); border-radius: 8px; background: var(--color-surface-subtle); }
+.atencion-confirmacion input { margin-top: .25rem; width: 1.125rem; height: 1.125rem; flex: none; }
+.atencion-origen { display: flex; align-items: flex-start; gap: var(--space-2); margin: var(--space-2) 0 0; font-size: .8125rem; color: var(--color-text-secondary); }
+.atencion-origen .icon { flex: none; margin-top: .125rem; }

@@ -3,7 +3,7 @@
 {%- from "ui/iconos.html" import icon -%}
 {%- from "ui/etiquetas.html" import badge, draft_status, channel_name, channel_inline, capitalizar -%}
 {%- from "ui/avisos.html" import empty_state -%}
-{%- from "ui/botones.html" import button -%}
+{%- from "ui/botones.html" import button, link_button -%}
 {%- from "ui/formularios.html" import csrf_field -%}
 {%- from "ui/encabezados.html" import section_header -%}
 
@@ -198,18 +198,20 @@
     </ul>
   </div>
   {%- endif %}
-  <p class="review__note">Para completar datos, el profesional responde al último mensaje del bot desde la misma cuenta y canal. La web no edita campos.</p>
+  <p class="review__note">Para completar datos, usa "Revisar y completar", o responde al último mensaje del bot desde la misma cuenta y canal.</p>
 </section>
 {%- endif %}
 {%- endmacro %}
 
 {#- Acciones: descartar (POST + CSRF + confirmación) mientras esté pendiente. El diálogo propio
     (JS progresivo) lee los data-confirm-*; sin JS queda el confirm() nativo. -#}
-{% macro draft_actions(borrador, residente, profesional, puede_descartar, csrf) -%}
+{% macro draft_actions(borrador, residente, profesional, puede_descartar, csrf, atencion=None) -%}
 {%- if puede_descartar or borrador.estado == "descartado" %}
 <section class="card actions" aria-labelledby="t-acciones">
   <h2 class="review__title" id="t-acciones">Acciones</h2>
   {%- if puede_descartar %}
+  <p class="actions__text">Corrige y completa los datos en el formulario de atención, con el fragmento de origen de cada uno a la vista. Después se firma.</p>
+  {{ link_button("Continuar revisión" if atencion else "Revisar y completar", "/borradores/" ~ borrador.id ~ "/revisar", "primary", icon="file-text", block=True, clase="actions__button") }}
   <p class="actions__text">Si el borrador no corresponde, descártalo. Seguirá disponible para consulta como descartado.</p>
   <form method="post" action="/borradores/{{ borrador.id }}/descartar" data-enviando="Descartando…" data-resultado="descartado"
         data-confirm-title="¿Descartar el borrador #{{ borrador.id }}?"

@@ -24,6 +24,7 @@ from app.modelos import (
     Transcripcion,
     UsuarioWeb,
 )
+from app.nucleo.atenciones import atencion_del_borrador
 from app.nucleo.auditoria import Accion, registrar_evento
 from app.nucleo.borradores import sin_actividad
 from app.nucleo.campos import ETIQUETAS, ETIQUETAS_ANTECEDENTES
@@ -107,6 +108,7 @@ def detalle_de_borrador(
         extracciones=extracciones,
         nombres=nombres,
         puede_descartar=_puede_descartar(usuario, borrador),
+        atencion=atencion_del_borrador(sesion, borrador.id),
     )
 
 
