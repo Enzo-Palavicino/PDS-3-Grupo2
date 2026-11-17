@@ -69,7 +69,37 @@ literal y su modelo se guardarán antes de extraer, para poder reintentar sin re
 La imagen no se puede seudonimizar antes de enviarla: solo se prueban documentos ficticios.
 El proveedor fake sirve para tests, no demuestra capacidad del modelo del curso.
 
-**Validación real pendiente:** probar 2 o 3 manuscritos ficticios del equipo y registrar en #17
-los tiempos, errores de lectura y una salida de ejemplo. No dar por confirmado el soporte de
-imágenes hasta completar esa prueba. Si la API no las acepta, avisar en #17 y acordar el plan B
-(OCR local para impresos y transcripción asistida para manuscritos) antes de integrar E4-03.
+### Resultado real del spike (17 de noviembre de 2026)
+
+La key del curso aceptó las tres fotos JPG de manuscritos ficticios preparados por el equipo.
+Modelo solicitado y devuelto: `gpt-6-luna`. Se probaron dos pasadas; la segunda incorpora una
+instrucción explícita para no reconstruir tachaduras y razonamiento `medium` en la lectura.
+
+| Muestra | Primera pasada | Configuración final | Observación |
+| --- | --- | --- | --- |
+| Ficha completa | 9,27 s | 10,93 s | Reconoce residente, antecedentes, peso, talla y control. Persiste un error: lee la fecha como 12/08/2016; el autor confirmó 12/08/2026. El año de hospitalización mejoró de 2016 a 2026. |
+| Seguimiento con tratamiento ficticio | 11,46 s | 14,44 s | Conserva el diagnóstico vacío. Hay variación entre pasadas: la segunda lee 2016 en algunas fechas que la primera leyó como 2026. |
+| Ficha sin fecha y con tachadura | 10,23 s | 9,02 s | Conserva fecha y talla vacías, peso 11,2 kg y “en dos semanas”. Con la configuración final marca la palabra tachada como `[ilegible]`. |
+
+Ejemplo literal de la última lectura:
+
+```text
+Peso (kg)
+11,2 Kg
+Talla (cm)
+
+Proximo control
+en dos semanas
+
+Observaciones
+probando una [ilegible] tachada
+```
+
+**Decisión:** usar `leer_imagen` para lectura asistida, seguida de seudonimización y extracción.
+No es una transcripción fiable sin revisión: los errores de año y la variación entre pasadas
+obligan a comparar y corregir cada dato contra el original antes de incorporar (E4-04).
+No se corrigen fechas automáticamente usando los guiones ni la fecha actual. La fecha original
+confirmada al subir es la referencia para las expresiones relativas; si falta, no se usa hoy.
+Las pruebas fueron manuales con tres documentos ficticios, no una certificación de exactitud.
+El plan B (OCR local para impresos y transcripción asistida) no fue necesario para comprobar
+compatibilidad con imágenes. Resultados y decisión registrados en #17.

@@ -114,6 +114,8 @@ def test_envia_la_imagen_y_devuelve_texto_literal_con_el_modelo_usado(mime):
     assert cuerpo["model"] == "gpt-6-luna"
     assert cuerpo["messages"][0] == {"role": "system", "content": INSTRUCCIONES_LECTURA}
     assert "[ilegible]" in cuerpo["messages"][0]["content"]
+    assert "No reconstruyas texto tachado" in cuerpo["messages"][0]["content"]
+    assert cuerpo["reasoning_effort"] == "medium"
     assert cuerpo["messages"][1]["content"][1] == {
         "type": "image_url",
         "image_url": {
