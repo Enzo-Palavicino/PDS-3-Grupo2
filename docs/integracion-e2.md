@@ -137,3 +137,40 @@ un lock porque no es seguro invocarlo concurrentemente desde el worker y las car
 Los logs del worker guardan solo id y tipo de error, sin trazas del documento. También se
 desactiva el detalle del SDK de OpenAI, que podría publicar cuerpos de peticiones en DEBUG.
 La extracción no incorpora datos clínicos ni crea atenciones: eso requiere la revisión E4-04.
+
+## Revisión de documentos (E4-04)
+
+La encargada de salud abre `/digitalizacion/{id}` desde el seguimiento de carga o la ficha.
+La imagen (o vista previa PNG del PDF) aparece junto a campos editables y sus fragmentos.
+Los originales se conservan intactos; la lectura literal, las ambigüedades y las marcas
+`[ilegible]` están disponibles para comparar. La revisión y la vista previa son autenticadas,
+auditadas y sin caché. El enlace de descarga sigue usando los permisos de adjuntos.
+
+`verificar_documento` y `descartar_documento`, en `app/nucleo/revision_documentos.py`, validan
+el rol y bloquean el documento; no hacen commit. La ruta confirma atómicamente el resultado,
+la incorporación a ficha y su auditoría. Solo se verifica desde `por_revisar`; se permite
+descartar desde `por_revisar` o `error`, siempre con un motivo. No se cancela una lectura en
+curso. Repetir una acción sobre un documento ya incorporado o descartado responde conflicto.
+
+Reglas confirmadas para esta entrega:
+
+- Si no aparece el profesional, la revisora indica «No consta en el original»; no se atribuye
+  el documento a quien está conectado ni se inventa un profesional.
+- Los posibles duplicados **bloquean** la incorporación, sin opción de saltarse la advertencia.
+  Se recalculan con los campos revisados justo antes de incorporar; también se serializan
+  las revisiones del mismo residente. Se pueden corregir errores reales de lectura o descartar.
+- La fecha clínica original puede quedar desconocida. No se reemplaza por hoy. Las fechas
+  de carga, revisión y atención son independientes; las fechas relativas requieren revisión humana.
+
+La atención queda con origen `historico`, profesional en texto libre y `verificada_por/en`.
+El estado compartido `firmada` permite mostrar registros confirmados en la ficha, pero
+`firmada_por/en` y `hash_firma` quedan vacíos: verificar un histórico **no es una firma médica**.
+Se reutiliza `incorporar_a_ficha` para tratamientos, controles, antecedentes y mediciones;
+los tratamientos históricos sin término futuro quedan terminados según su regla existente.
+El historial muestra «Digitalizado», el profesional del original, quién verificó, cuándo y
+el enlace al documento original.
+
+Los campos extraídos del documento permanecen como evidencia de la IA. Los datos revisados
+se guardan en la atención y `campos_editados` registra sus diferencias. Un valor modificado
+no conserva un fragmento que ya no lo respalda. Añadir o quitar filas no reasigna fragmentos.
+La auditoría guarda identificadores, no campos clínicos ni el motivo textual del descarte.

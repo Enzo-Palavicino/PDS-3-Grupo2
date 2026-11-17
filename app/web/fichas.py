@@ -73,6 +73,13 @@ def ver(residente_id: int, request: Request, sesion: SesionBD, usuario: Personal
     resumen = resumen_de_ficha(sesion, residente_id, hoy)
     atenciones = historial(sesion, residente_id)
     sin_firmar = _atenciones_sin_firmar(sesion, residente_id, usuario)
+    documentos = _documentos(sesion, residente_id)
+    originales = {d.atencion_id: adj.id for d, adj in documentos if d.atencion_id}
+    verificadores = {
+        u.id: u.usuario for u in sesion.scalars(select(UsuarioWeb).where(
+            UsuarioWeb.id.in_([a.verificada_por for a in atenciones if a.verificada_por])
+        ))
+    }
 
     # Cada lectura queda registrada: quién abrió qué ficha y cuándo (D41, art. 9).
     registrar_evento(
@@ -98,6 +105,8 @@ def ver(residente_id: int, request: Request, sesion: SesionBD, usuario: Personal
             {
                 "atencion": atencion,
                 "integra": verificar_integridad(atencion),
+                "original_id": originales.get(atencion.id),
+                "verificador": verificadores.get(atencion.verificada_por),
                 "filas": [fila for fila in filas_de_campos(atencion.campos or {}) if fila["valor"]],
             }
             for atencion in atenciones
@@ -106,7 +115,7 @@ def ver(residente_id: int, request: Request, sesion: SesionBD, usuario: Personal
         borradores=_borradores_pendientes(sesion, residente_id, usuario),
         sin_firmar=[(a, puede_firmar(usuario, a)) for a in sin_firmar],
         adjuntos=_adjuntos(sesion, residente_id),
-        documentos=_documentos(sesion, residente_id),
+        documentos=documentos,
         estados_de_documento=ESTADOS_DE_DOCUMENTO,
         puede_registrar=puede_registrar_atencion(sesion, usuario, residente_id),
         puede_digitalizar=usuario.rol == Rol.ENCARGADA_SALUD,
