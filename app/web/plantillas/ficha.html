@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{%- from "ui/encabezados.html" import page_header, section_header, back_link -%}
+{%- from "ui/avisos.html" import alert, empty_state -%}
+{%- from "ui/botones.html" import link_button -%}
+{%- from "ui/etiquetas.html" import badge, channel_name, capitalizar -%}
+{%- from "dominio/tratamientos.html" import lista_de_tratamientos -%}
+{%- from "dominio/firma.html" import firma_de_atencion -%}
+{#- Ficha del residente (E1-02). Primero el resumen y después el historial, ambos solo con
+    información firmada. Lo que falta firmar va al final, en una sección aparte. -#}
+{%- set ORIGENES = {"web": "Web", "telegram": "Telegram", "whatsapp": "WhatsApp", "historico": "Digitalizado"} -%}
+{%- set TIPOS_DE_ADJUNTO = {"receta": "Receta", "examen": "Examen", "informe": "Informe", "otro": "Otro"} -%}
+{%- set nombre = residente.nombres ~ " " ~ residente.apellidos -%}
+
+{% macro lista_de_antecedentes(antecedentes, vacio) -%}
+{%- if antecedentes %}
+<ul>
+  {%- for a in antecedentes %}
+  <li>{{ a.descripcion }}{% if a.fecha %} <span class="meta">· {{ a.fecha.strftime("%d-%m-%Y") }}</span>{% endif %}</li>
+  {%- endfor %}
+</ul>
+{%- else %}
+<p class="meta">{{ vacio }}</p>
+{%- endif %}
+{%- endmacro %}
+
+{% macro nombre_profesional(atencion) -%}
+{%- set profesional = profesionales.get(atencion.profesional_id) -%}
+{%- if profesional %}{{ profesional.nombre }} <span class="meta">· {{ capitalizar(profesional.especialidad) }}</span>
+{%- elif atencion.profesional_texto %}{{ atencion.profesional_texto }}
+{%- else %}<span class="missing">Sin profesional</span>{% endif -%}
+{%- endmacro %}
+
+{% block titulo %}Ficha de {{ nombre }}{% endblock %}
+{% block clase_main %}page page--detail{% endblock %}
+{% block contenido %}
+{{ back_link("/fichas", "Fichas") }}
+{% call page_header(nombre, "Ficha clínica. El resumen y el historial muestran solo atenciones firmadas.") %}
+{{ badge(capitalizar(residente.estado), "info" if residente.estado == "activo" else "discarded") }}
+{% endcall %}
+
+<section class="section card" aria-labelledby="datos-residente">
+  {{ section_header("Datos del residente", id="datos-residente") }}
+  <dl class="meta-list">
+    <div><dt>Código</dt><dd><span class="code">{{ residente.codigo }}</span></dd></div>
+    {%- if residente.apodo %}<div><dt>Apodo</dt><dd>{{ residente.apodo }}</dd></div>{% endif %}
+    <div><dt>Edad</dt><dd>{{ edad }}</dd></div>
+    <div><dt>Nivel</dt><dd>{{ residente.nivel.replace("_", " ") | capitalize }}</dd></div>
+    <div><dt>Estado</dt><dd>{{ capitalizar(residente.estado) }}</dd></div>
+  </dl>
+  <p class="ficha-acciones">
+    {%- if puede_registrar %}{{ link_button("Nueva atención", "/atenciones/nueva?residente_id=" ~ residente.id, "primary", icon="stethoscope") }}{% endif %}
+    {%- if puede_digitalizar %}{{ link_button("Digitalizar documento", "/digitalizacion?residente_id=" ~ residente.id, "secondary", icon="scan-text") }}{% endif %}
+  </p>
+</section>
+
+<section class="section card" aria-labelledby="resumen">
+  {{ section_header("Resumen", id="resumen") }}
+  <div class="ficha-resumen">
+    <div>
+      <h3>Alergias</h3>
+      {{ lista_de_antecedentes(resumen.alergias, "Sin alergias registradas.") }}
+    </div>
+    <div>
+      <h3>Diagnósticos</h3>
+      {{ lista_de_antecedentes(resumen.diagnosticos, "Sin diagnósticos crónicos registrados.") }}
+    </div>
+    <div class="ficha-resumen__ancho">
+      <h3>Tratamientos activos</h3>
+      {{ lista_de_tratamientos(tratamientos, puede_suspender, csrf) }}
+    </div>
+    <div>
+      <h3>Último peso y talla</h3>
+      {%- set m = resumen.ultima_medicion %}
+      {%- if m %}
+      <p>
+        {%- if m.peso_kg %}{{ m.peso_kg }} kg{% endif %}{% if m.peso_kg and m.talla_cm %} · {% endif %}{% if m.talla_cm %}{{ m.talla_cm }} cm{% endif %}
+        {%- if m.fecha %} <span class="meta">· {{ m.fecha.strftime("%d-%m-%Y") }}</span>{% endif %}
+      </p>
+      {%- else %}
+      <p class="meta">Sin mediciones registradas.</p>
+      {%- endif %}
+    </div>
+    <div>
+      <h3>Próximos controles</h3>
+      {%- if resumen.proximos_controles %}
+      <ul>
+        {%- for c in resumen.proximos_controles %}
+        <li>{% if c.fecha %}{{ c.fecha.strftime("%d-%m-%Y") }}{% else %}Sin fecha{% endif %}{% if c.descripcion %} · {{ c.descripcion }}{% endif %}</li>
+        {%- endfor %}
+      </ul>
+      {%- else %}
+      <p class="meta">Sin controles pendientes.</p>
+      {%- endif %}
+    </div>
+    <div>
+      <h3>Hospitalizaciones</h3>
+      {{ lista_de_antecedentes(resumen.hospitalizaciones, "Sin hospitalizaciones registradas.") }}
+    </div>
+    <div>
+      <h3>Vacunas</h3>
+      {{ lista_de_antecedentes(resumen.vacunas, "Sin vacunas registradas.") }}
+    </div>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="historial">
+  {{ section_header("Historial de atenciones", (atenciones | length) ~ (" firmada" if atenciones | length == 1 else " firmadas"), id="historial") }}
+  {%- for item in atenciones %}
+  {%- set a = item.atencion %}
+  <article class="card ficha-atencion" id="atencion-{{ a.id }}">
+    <h3>
+      {%- if a.fecha_atencion %}{{ a.fecha_atencion.strftime("%d-%m-%Y") }}{% else %}Fecha desconocida{% endif %}
+      · {{ badge(ORIGENES.get(a.origen, a.origen), "info") }}
+    </h3>
+    <p>{{ nombre_profesional(a) }}</p>
+    {%- if item.filas %}
+    <details class="disclosure">
+      <summary>Ver el registro de la atención</summary>
+      <dl class="meta-list disclosure__body">
+        {%- for fila in item.filas %}
+        <div><dt>{{ fila.etiqueta }}</dt><dd>{{ fila.valor | con_nombres({residente.codigo: nombre}) }}</dd></div>
+        {%- endfor %}
+      </dl>
+    </details>
+    {%- endif %}
+    {%- if a.hash_firma and a.profesional_id %}
+    {{ firma_de_atencion(a, item.integra) }}
+    {%- elif a.verificada_en %}
+    <p class="meta">Verificada contra el documento original el {{ a.verificada_en | hora_chile }}.</p>
+    {%- endif %}
+  </article>
+  {%- else %}
+  {{ empty_state("Todavía no hay atenciones firmadas", "Aparecen aquí cuando un profesional firma una atención de este residente.", icon="file-text", size="compact") }}
+  {%- endfor %}
+</section>
+
+<section class="section card" aria-labelledby="archivos">
+  {{ section_header("Adjuntos y documentos históricos", id="archivos") }}
+  <h3>Adjuntos</h3>
+  {%- if adjuntos %}
+  <ul>
+    {%- for adj in adjuntos %}
+    <li><a href="/adjuntos/{{ adj.id }}/descargar">{{ adj.nombre_archivo }}</a> <span class="meta">· {{ TIPOS_DE_ADJUNTO.get(adj.tipo, adj.tipo) }}{% if adj.emisor %} · {{ adj.emisor }}{% endif %} · {{ adj.subido_en | hora_chile }}</span></li>
+    {%- endfor %}
+  </ul>
+  {%- else %}
+  <p class="meta">Sin adjuntos.</p>
+  {%- endif %}
+  <h3>Documentos históricos</h3>
+  {%- if documentos %}
+  <ul>
+    {%- for doc, adj in documentos %}
+    <li><a href="/adjuntos/{{ adj.id }}/descargar">{{ adj.nombre_archivo }}</a> <span class="meta">· {{ doc.tipo_documento or "Sin tipo" }}{% if doc.fecha_original %} · {{ doc.fecha_original.strftime("%d-%m-%Y") }}{% endif %}</span> {{ badge(estados_de_documento.get(doc.estado, "Pendiente"), "pending" if doc.estado not in ("incorporado", "descartado") else "info") }}</li>
+    {%- endfor %}
+  </ul>
+  {%- else %}
+  <p class="meta">Sin documentos históricos.</p>
+  {%- endif %}
+</section>
+
+<section class="section card card--highlight" aria-labelledby="pendiente">
+  {{ section_header("Pendiente de revisión y firma", id="pendiente") }}
+  {% call alert("warning", compact=True) %}Esto no es información confirmada: no aparece en el resumen ni en el historial hasta que un profesional lo revise y lo firme.{% endcall %}
+  {%- if borradores or sin_firmar %}
+  <ul>
+    {%- for b in borradores %}
+    <li><a href="/borradores/{{ b.id }}">Borrador #{{ b.id }}</a> <span class="meta">· de la IA, por {{ channel_name(b.canal) }} · {{ b.creado_en | hora_chile }}</span> {{ badge("Pendiente", "pending") }}</li>
+    {%- endfor %}
+    {%- for a, firmable in sin_firmar %}
+    <li>
+      {%- if firmable %}<a href="/atenciones/{{ a.id }}/firmar">Atención #{{ a.id }}</a>{% else %}Atención #{{ a.id }}{% endif %}
+      <span class="meta">· {{ nombre_profesional(a) }} · creada el {{ a.creado_en | hora_chile }}</span> {{ badge("Sin firmar", "pending") }}
+    </li>
+    {%- endfor %}
+  </ul>
+  {%- else %}
+  <p class="meta">No hay borradores ni atenciones sin firmar.</p>
+  {%- endif %}
+</section>
+{% endblock %}

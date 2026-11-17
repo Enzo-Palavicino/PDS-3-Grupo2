@@ -240,7 +240,7 @@
       <tr>
         <td class="drafts__id"><a href="/borradores/{{ borrador.id }}"><span class="visually-hidden">Borrador </span>#{{ borrador.id }}</a></td>
         <td class="drafts__date" data-label="Creado">{{ borrador.creado_en | hora_chile }}</td>
-        <td class="drafts__resident">{% if residente %}{{ nombre_residente(residente) }}{% else %}<span class="missing">Sin identificar</span>{% endif %}</td>
+        <td class="drafts__resident">{% if residente %}<a href="/residentes/{{ residente.id }}" title="Abrir la ficha">{{ nombre_residente(residente) }}</a>{% else %}<span class="missing">Sin identificar</span>{% endif %}</td>
         <td class="drafts__pro" data-label="Profesional"><span class="drafts__pro-inner"><span>{{ profesional.nombre }}</span><span class="meta">{{ capitalizar(profesional.especialidad) }}</span></span></td>
         <td class="drafts__channel" data-label="Canal">{{ channel_inline(borrador.canal) }}</td>
         <td class="drafts__missing" data-label="Falta">

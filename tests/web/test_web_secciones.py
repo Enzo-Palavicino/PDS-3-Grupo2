@@ -42,7 +42,7 @@ def test_las_secciones_pendientes_se_pueden_abrir_sin_ejecutar_servicios(
     cliente, entrar, cuenta
 ):
     entrar(cuenta)
-    rutas = ["/fichas", "/residentes/2", "/atenciones"]
+    rutas = ["/atenciones"]
     for ruta in rutas:
         respuesta = cliente.get(ruta)
         assert respuesta.status_code == 501

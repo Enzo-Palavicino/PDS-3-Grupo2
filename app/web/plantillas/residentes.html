@@ -21,7 +21,7 @@
 <td>{{ residente.nivel.replace('_', ' ').capitalize() }}</td><td>{{ residente.estado.capitalize() }}</td>
 <td>{{ residente.fecha_ingreso or "Sin fecha" }}</td>
 <td>{% for profesional in asignados.get(residente.id, []) %}<div>{{ profesional.nombre }}<br><small>{{ profesional.especialidad }}{% if not profesional.activo %} · Desactivado, sin acceso{% endif %}</small></div>{% else %}Sin profesionales asignados{% endfor %}</td>
-<td><a href="/residentes/{{ residente.id }}/editar">Editar / {{ "egresar" if residente.estado == "activo" else "reingresar" }}</a><br><a href="/residentes/{{ residente.id }}/asignaciones">Asignar profesionales</a></td>
+<td>{% if usuario.rol == "encargada_salud" %}<a href="/residentes/{{ residente.id }}">Ver ficha</a><br>{% endif %}<a href="/residentes/{{ residente.id }}/editar">Editar / {{ "egresar" if residente.estado == "activo" else "reingresar" }}</a><br><a href="/residentes/{{ residente.id }}/asignaciones">Asignar profesionales</a></td>
 </tr>{% else %}<tr><td colspan="7">{{ "No hay residentes que coincidan con los filtros." if total else "Aún no hay residentes registrados." }}</td></tr>{% endfor %}</tbody>
 </table></div>
 {% endblock %}
