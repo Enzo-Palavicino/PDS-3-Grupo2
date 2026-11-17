@@ -26,7 +26,7 @@ from app.modelos import (
 )
 from app.nucleo.auditoria import Accion, registrar_evento
 from app.nucleo.borradores import sin_actividad
-from app.nucleo.campos import ETIQUETAS
+from app.nucleo.campos import ETIQUETAS, ETIQUETAS_ANTECEDENTES
 from app.nucleo.permisos import puede_ver_ficha, residentes_asignados
 from app.web.autenticacion import SesionBD, exigir_rol, verificar_csrf
 from app.web.plantillas import pagina
@@ -156,7 +156,7 @@ def filas_de_campos(campos: dict[str, Any]) -> list[dict[str, Any]]:
     aparecen, para ver de un vistazo lo que falta. La clave la usa la plantilla para agrupar los
     campos y enlazar cada faltante o ambigüedad con su fila."""
     filas = []
-    for clave, etiqueta in ETIQUETAS.items():
+    for clave, etiqueta in (ETIQUETAS | ETIQUETAS_ANTECEDENTES).items():
         dato = campos.get(clave)
         datos = [d for d in (dato if isinstance(dato, list) else [dato]) if d]
         if not datos:
@@ -193,4 +193,10 @@ def _valor_legible(clave: str, dato: dict[str, Any]) -> str | None:
     if clave == "acompanante":
         nombre, cargo = dato.get("nombre"), dato.get("cargo")
         return f"{nombre} ({cargo})" if nombre and cargo else nombre or cargo
+    if clave == "mediciones":
+        return " · ".join(
+            f"{etiqueta}: {dato[nombre]} {unidad}"
+            for nombre, etiqueta, unidad in (("peso_kg", "Peso", "kg"), ("talla_cm", "Talla", "cm"))
+            if dato.get(nombre) is not None
+        ) or None
     return dato.get("valor")

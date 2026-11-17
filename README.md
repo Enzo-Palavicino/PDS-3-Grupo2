@@ -238,6 +238,12 @@ Un LLM convierte el texto libre del registro (escrito o transcrito) en los campo
 de Atención y Control de Salud": residente, fecha, lugar, motivo, diagnósticos, indicaciones,
 próximo control, acompañante, etc. Cada campo trae el fragmento del texto que lo respalda.
 
+También reconoce alergias, vacunas, hospitalizaciones y mediciones de peso (kg) y talla (cm).
+Las mediciones son números positivos con su fragmento; si solo se informa una, la otra queda
+vacía. La vista del borrador muestra estos antecedentes junto a su evidencia, incluso cuando un
+borrador antiguo no los contiene. No se agregan nuevos campos obligatorios para completar la
+atención. Al firmarla, los antecedentes pasan a la ficha mediante el servicio de incorporación.
+
 1. **Seudonimización** (`app/nucleo/seudonimizacion.py`): los nombres, apellidos y apodos de los
    residentes se reemplazan por su código (`[RES-02]`), sin importar mayúsculas ni tildes y
    tolerando errores menores de transcripción. Un nombre que comparten dos residentes queda
