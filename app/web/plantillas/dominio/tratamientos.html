@@ -1,0 +1,56 @@
+{#- Tratamientos de un residente, para la ficha (E1-02). Recibe el resultado de
+    tratamientos.tratamientos_del_residente: los vigentes arriba y el historial plegado. Con
+    puede_suspender (permisos.puede_suspender_tratamiento), cada vigente trae su formulario. -#}
+{%- from "ui/etiquetas.html" import badge -%}
+{%- from "ui/formularios.html" import csrf_field -%}
+
+{% macro detalle_del_tratamiento(t) -%}
+<strong>{{ t.medicamento }}</strong>
+{%- for parte in [t.dosis, t.frecuencia_horario, t.via, t.duracion] if parte %} · {{ parte }}{% endfor %}
+<span class="meta">
+  {%- if t.indicado_en %} Indicado el {{ t.indicado_en.strftime("%d-%m-%Y") }}{% endif %}
+  {%- if t.fecha_inicio %} · desde {{ t.fecha_inicio.strftime("%d-%m-%Y") }}{% endif %}
+  {%- if t.fecha_termino %} · hasta {{ t.fecha_termino.strftime("%d-%m-%Y") }}{% endif %}
+</span>
+{%- endmacro %}
+
+{% macro lista_de_tratamientos(tratamientos, puede_suspender, csrf) -%}
+<div class="tratamientos">
+  {%- if tratamientos.vigentes %}
+  <ul class="tratamientos__vigentes">
+    {%- for t in tratamientos.vigentes %}
+    <li>
+      {{ badge("Activo", "info") }} {{ detalle_del_tratamiento(t) }}
+      {%- if puede_suspender %}
+      <form method="post" action="/tratamientos/{{ t.id }}/suspender" data-enviando="Suspendiendo…">
+        {{ csrf_field(csrf) }}
+        <label for="motivo-{{ t.id }}">Motivo de la suspensión</label>
+        <input id="motivo-{{ t.id }}" name="motivo" type="text" required maxlength="500">
+        <button class="btn btn--neutral">Suspender</button>
+      </form>
+      {%- endif %}
+    </li>
+    {%- endfor %}
+  </ul>
+  {%- else %}
+  <p class="meta">Sin tratamientos activos.</p>
+  {%- endif %}
+  {%- if tratamientos.historial %}
+  <details class="tratamientos__historial">
+    <summary>Historial de tratamientos ({{ tratamientos.historial | length }})</summary>
+    <ul>
+      {%- for t in tratamientos.historial %}
+      <li>
+        {%- if t.estado == "suspendido" %}
+        {{ badge("Suspendido", "discarded") }} {{ detalle_del_tratamiento(t) }}
+        <span class="meta">Suspendido el {{ t.suspendido_en | hora_chile }}: {{ t.motivo_suspension }}</span>
+        {%- else %}
+        {{ badge("Terminado", "discarded") }} {{ detalle_del_tratamiento(t) }}
+        {%- endif %}
+      </li>
+      {%- endfor %}
+    </ul>
+  </details>
+  {%- endif %}
+</div>
+{%- endmacro %}

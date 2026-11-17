@@ -1,10 +1,23 @@
 from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
-from sqlalchemy import func, select, text
+from sqlalchemy import func, inspect, select, text
 from sqlalchemy.exc import DBAPIError, IntegrityError, StatementError
 
-from app.modelos import EventoAuditoria, Profesional, TipoActor, VinculoCanal
+from app.modelos import (
+    Adjunto,
+    Asignacion,
+    Atencion,
+    BorradorAtencion,
+    EstadoAtencion,
+    EstadoResidente,
+    EventoAuditoria,
+    OrigenAtencion,
+    Profesional,
+    TipoActor,
+    TipoAdjunto,
+    VinculoCanal,
+)
 
 # Auditoría solo de inserción
 
@@ -81,3 +94,62 @@ def test_una_fecha_sin_zona_horaria_se_rechaza(sesion):
 
     with pytest.raises(StatementError, match="zona horaria"):
         sesion.commit()
+
+
+# Ficha clínica
+
+
+def test_un_residente_nuevo_queda_activo(sesion, residente):
+    assert residente.estado == EstadoResidente.ACTIVO
+
+
+def test_un_profesional_no_se_asigna_dos_veces_al_mismo_residente(sesion, residente, profesional):
+    sesion.add(Asignacion(residente_id=residente.id, profesional_id=profesional.id))
+    sesion.commit()
+
+    sesion.add(Asignacion(residente_id=residente.id, profesional_id=profesional.id))
+    with pytest.raises(IntegrityError):
+        sesion.commit()
+
+
+def test_un_borrador_se_convierte_en_una_sola_atencion(sesion, residente, profesional):
+    borrador = BorradorAtencion(profesional_id=profesional.id, canal="telegram")
+    sesion.add(borrador)
+    sesion.commit()
+
+    def atencion() -> Atencion:
+        return Atencion(
+            residente_id=residente.id,
+            profesional_id=profesional.id,
+            origen=OrigenAtencion.TELEGRAM,
+            borrador_id=borrador.id,
+        )
+
+    sesion.add(atencion())
+    sesion.commit()
+    assert sesion.scalar(select(Atencion)).estado == EstadoAtencion.BORRADOR
+
+    sesion.add(atencion())
+    with pytest.raises(IntegrityError):
+        sesion.commit()
+
+
+def test_el_contenido_de_un_adjunto_se_lee_solo_al_usarlo(sesion, residente):
+    sesion.add(
+        Adjunto(
+            residente_id=residente.id,
+            nombre_archivo="receta.pdf",
+            tipo=TipoAdjunto.RECETA,
+            mime="application/pdf",
+            tamano_bytes=4,
+            sha256="0" * 64,
+            contenido=b"%PDF",
+        )
+    )
+    sesion.commit()
+    sesion.expunge_all()  # obliga a leer de nuevo desde la base de datos
+
+    adjunto = sesion.scalar(select(Adjunto))
+
+    assert "contenido" in inspect(adjunto).unloaded
+    assert adjunto.contenido == b"%PDF"

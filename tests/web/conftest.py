@@ -22,7 +22,9 @@ def datos_demo(sesion):
 
 
 @pytest.fixture
-def cliente(url_bd, datos_demo):
+def cliente(url_bd, datos_demo, monkeypatch):
+    # Los tests de rutas controlan los estados; el worker real se prueba por separado.
+    monkeypatch.setattr("app.main.Worker.iniciar", lambda self: None)
     config = Config(_env_file=None, database_url=url_bd, secret_key="clave-de-sesion-de-prueba")
     # Con "with", el TestClient ejecuta el inicio de la aplicación (la conexión a la base de datos).
     with TestClient(crear_app(config)) as cliente:

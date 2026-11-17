@@ -8,7 +8,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.modelos import (
@@ -24,8 +24,11 @@ from app.modelos import (
     Transcripcion,
     UsuarioWeb,
 )
+from app.nucleo.atenciones import atencion_del_borrador
 from app.nucleo.auditoria import Accion, registrar_evento
 from app.nucleo.borradores import sin_actividad
+from app.nucleo.campos import ETIQUETAS, ETIQUETAS_ANTECEDENTES
+from app.nucleo.permisos import puede_ver_ficha, residentes_asignados
 from app.web.autenticacion import SesionBD, exigir_rol, verificar_csrf
 from app.web.plantillas import pagina
 
@@ -34,24 +37,6 @@ router = APIRouter()
 LectorDeBorradores = Annotated[
     UsuarioWeb, Depends(exigir_rol(Rol.ENCARGADA_SALUD, Rol.PROFESIONAL))
 ]
-
-# Campos del Registro de Atención, en el orden en que se muestran.
-ETIQUETAS = {
-    "residente": "Residente",
-    "fecha_atencion": "Fecha de atención",
-    "hora_atencion": "Hora",
-    "lugar": "Lugar",
-    "especialidad": "Especialidad",
-    "motivo": "Motivo",
-    "diagnosticos": "Diagnósticos",
-    "evolucion_clinica": "Evolución clínica",
-    "observaciones": "Observaciones",
-    "indicaciones_farmacologicas": "Indicaciones farmacológicas",
-    "otras_indicaciones": "Otras indicaciones",
-    "examenes_solicitados": "Exámenes solicitados",
-    "proximo_control": "Próximo control",
-    "acompanante": "Acompañante",
-}
 
 
 @router.get("/borradores")
@@ -63,7 +48,9 @@ def lista_de_borradores(request: Request, sesion: SesionBD, usuario: LectorDeBor
         .order_by(BorradorAtencion.id.desc())
     )
     if usuario.rol == Rol.PROFESIONAL:
-        consulta = consulta.where(BorradorAtencion.profesional_id == usuario.profesional_id)
+        consulta = consulta.where(BorradorAtencion.profesional_id == usuario.profesional_id,
+            or_(BorradorAtencion.residente_id.is_(None),
+                BorradorAtencion.residente_id.in_(residentes_asignados(usuario.profesional_id))))
     filas = sesion.execute(consulta).all()
     dias = _dias_sin_actividad(request)
     return pagina(
@@ -91,7 +78,10 @@ def detalle_de_borrador(
     extracciones = sesion.scalars(
         select(Extraccion).where(Extraccion.borrador_id == borrador.id).order_by(Extraccion.id)
     ).all()
-    nombres = {r.codigo: f"{r.nombres} {r.apellidos}" for r in sesion.scalars(select(Residente))}
+    consulta_nombres = select(Residente)
+    if usuario.rol == Rol.PROFESIONAL:
+        consulta_nombres = consulta_nombres.where(Residente.id.in_(residentes_asignados(usuario.profesional_id)))
+    nombres = {r.codigo: f"{r.nombres} {r.apellidos}" for r in sesion.scalars(consulta_nombres)}
 
     # Cada lectura queda registrada: quién abrió qué borrador y cuándo (D41, art. 9).
     registrar_evento(
@@ -118,6 +108,7 @@ def detalle_de_borrador(
         extracciones=extracciones,
         nombres=nombres,
         puede_descartar=_puede_descartar(usuario, borrador),
+        atencion=atencion_del_borrador(sesion, borrador.id),
     )
 
 
@@ -149,6 +140,8 @@ def _borrador_visible(sesion: Session, borrador_id: int, usuario: UsuarioWeb) ->
         raise HTTPException(404, "Ese borrador no existe.")
     if usuario.rol == Rol.PROFESIONAL and borrador.profesional_id != usuario.profesional_id:
         raise HTTPException(403, "Este borrador es de otro profesional.")
+    if usuario.rol == Rol.PROFESIONAL and borrador.residente_id is not None and not puede_ver_ficha(sesion, usuario, borrador.residente_id):
+        raise HTTPException(403, "No tienes asignación para este residente.")
     return borrador
 
 
@@ -165,7 +158,7 @@ def filas_de_campos(campos: dict[str, Any]) -> list[dict[str, Any]]:
     aparecen, para ver de un vistazo lo que falta. La clave la usa la plantilla para agrupar los
     campos y enlazar cada faltante o ambigüedad con su fila."""
     filas = []
-    for clave, etiqueta in ETIQUETAS.items():
+    for clave, etiqueta in (ETIQUETAS | ETIQUETAS_ANTECEDENTES).items():
         dato = campos.get(clave)
         datos = [d for d in (dato if isinstance(dato, list) else [dato]) if d]
         if not datos:
@@ -202,4 +195,10 @@ def _valor_legible(clave: str, dato: dict[str, Any]) -> str | None:
     if clave == "acompanante":
         nombre, cargo = dato.get("nombre"), dato.get("cargo")
         return f"{nombre} ({cargo})" if nombre and cargo else nombre or cargo
+    if clave == "mediciones":
+        return " · ".join(
+            f"{etiqueta}: {dato[nombre]} {unidad}"
+            for nombre, etiqueta, unidad in (("peso_kg", "Peso", "kg"), ("talla_cm", "Talla", "cm"))
+            if dato.get(nombre) is not None
+        ) or None
     return dato.get("valor")

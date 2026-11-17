@@ -15,13 +15,13 @@ from sqlalchemy.orm import Session
 
 from app.modelos import Rol, TipoActor, UsuarioWeb
 from app.nucleo.auditoria import Accion, registrar_evento
-from app.seguridad import verificar_password
+from app.nucleo.profesionales import validar_password
+from app.seguridad import hashear_password, verificar_password
 from app.web.plantillas import pagina
 
 router = APIRouter()
 
-# Página de inicio de cada rol. Cada rol tiene una sola sección: después de iniciar sesión, solo
-# se vuelve a páginas dentro de ella.
+# Página de inicio de cada rol; los destinos adicionales se autorizan en _destino.
 PAGINA_INICIAL = {
     Rol.DIRECTORA: "/vinculos",
     Rol.ENCARGADA_SALUD: "/borradores",
@@ -48,7 +48,9 @@ SesionBD = Annotated[Session, Depends(obtener_sesion_bd)]
 def verificar_csrf(request: Request, csrf: Annotated[str, Form()] = "") -> None:
     esperado = request.session.get("csrf", "")
     if not esperado or not hmac.compare_digest(csrf, esperado):
-        raise HTTPException(403, "El formulario venció. Vuelve a cargar la página e inténtalo otra vez.")
+        raise HTTPException(
+            403, "El formulario venció. Vuelve a cargar la página e inténtalo otra vez."
+        )
 
 
 def usuario_actual(request: Request, sesion: SesionBD) -> UsuarioWeb:
@@ -115,7 +117,10 @@ def iniciar_sesion(
     request.session.clear()
     request.session["usuario_id"] = encontrado.id
     registrar_evento(
-        sesion, Accion.INICIO_SESION, actor_tipo=TipoActor.USUARIO, actor_id=encontrado.id
+        sesion,
+        Accion.INICIO_SESION,
+        actor_tipo=TipoActor.USUARIO,
+        actor_id=encontrado.id,
     )
     sesion.commit()
     return RedirectResponse(_destino(siguiente, encontrado), status_code=303)
@@ -131,8 +136,59 @@ def _destino(siguiente: str, usuario: UsuarioWeb) -> str:
     """A dónde ir después de iniciar sesión: a la página pedida si es de la sección del rol (las
     demás le responderían 403, como un enlace de borrador abierto por la directora) y, si no, a
     su página de inicio."""
+    if usuario.rol in (Rol.DIRECTORA, Rol.ENCARGADA_SALUD) and (
+        siguiente == "/residentes" or siguiente.startswith(("/residentes/", "/residentes?"))
+    ):
+        return siguiente
     inicio = PAGINA_INICIAL[usuario.rol]
     # Como inicio empieza con "/" y una letra, esto también impide redirigir a otro sitio.
-    if siguiente == inicio or siguiente.startswith((f"{inicio}/", f"{inicio}?")):
-        return siguiente
+    destinos = [inicio, "/cuenta/password"]
+    if usuario.rol == Rol.DIRECTORA:
+        destinos.append("/profesionales")
+    for destino in destinos:
+        if siguiente == destino or siguiente.startswith((f"{destino}/", f"{destino}?")):
+            return siguiente
     return inicio
+
+
+UsuarioActual = Annotated[UsuarioWeb, Depends(usuario_actual)]
+
+
+@router.get("/cuenta/password")
+def formulario_password(request: Request, usuario: UsuarioActual):
+    return pagina(request, "password.html", usuario=usuario)
+
+
+@router.post("/cuenta/password", dependencies=[Depends(verificar_csrf)])
+def cambiar_password(
+    request: Request,
+    sesion: SesionBD,
+    usuario: UsuarioActual,
+    actual: Annotated[str, Form()] = "",
+    nueva: Annotated[str, Form()] = "",
+    confirmacion: Annotated[str, Form()] = "",
+):
+    try:
+        if not verificar_password(actual, usuario.hash_password):
+            raise ValueError("La contraseña actual no es correcta.")
+        validar_password(nueva)
+        if nueva != confirmacion:
+            raise ValueError("Las contraseñas nuevas no coinciden.")
+        if nueva == actual:
+            raise ValueError("Elige una contraseña distinta de la actual.")
+    except ValueError as exc:
+        return pagina(
+            request, "password.html", usuario=usuario, error=str(exc), status_code=400
+        )
+    usuario.hash_password = hashear_password(nueva)
+    registrar_evento(
+        sesion,
+        Accion.CONTRASENA_CAMBIADA,
+        TipoActor.USUARIO,
+        actor_id=usuario.id,
+        entidad="usuario",
+        entidad_id=usuario.id,
+    )
+    sesion.commit()
+    request.session.clear()
+    return RedirectResponse("/login", status_code=303)

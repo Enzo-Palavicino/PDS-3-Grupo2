@@ -1,0 +1,21 @@
+{#- Correcciones (adendas) de una atención, para la ficha (E1-02). Una atención firmada no
+    cambia: se muestra junto con las adendas que la corrigen. -#}
+{%- from "ui/avisos.html" import alert -%}
+
+{#- En la atención original: correcciones es el resultado de adendas.correcciones_de. -#}
+{% macro corregida_por(correcciones) -%}
+{%- for adenda in correcciones %}
+{% call alert("warning", title="Corregida", compact=True) -%}
+Por la <a href="/atenciones/{{ adenda.id }}">atención #{{ adenda.id }}</a>, firmada el {{ adenda.firmada_en | hora_chile }}. Motivo: {{ adenda.motivo_correccion }}
+{%- endcall %}
+{%- endfor %}
+{%- endmacro %}
+
+{#- En la adenda: a qué atención corrige y por qué. -#}
+{% macro corrige_a(adenda) -%}
+{%- if adenda.corrige_a_id %}
+{% call alert("info", compact=True) -%}
+Corrige la <a href="/atenciones/{{ adenda.corrige_a_id }}">atención #{{ adenda.corrige_a_id }}</a>. Motivo: {{ adenda.motivo_correccion }}
+{%- endcall %}
+{%- endif %}
+{%- endmacro %}

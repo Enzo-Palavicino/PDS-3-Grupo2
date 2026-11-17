@@ -12,7 +12,7 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.db import ahora
-from app.modelos import CodigoVinculacion, TipoActor, VinculoCanal
+from app.modelos import CodigoVinculacion, Profesional, TipoActor, VinculoCanal
 from app.nucleo.auditoria import Accion, registrar_evento
 
 VIGENCIA_CODIGO = timedelta(minutes=10)
@@ -61,6 +61,9 @@ def canjear_codigo(
             CodigoVinculacion.codigo == codigo,
             CodigoVinculacion.usado_en.is_(None),
             CodigoVinculacion.expira_en > momento,
+            CodigoVinculacion.profesional_id.in_(
+                select(Profesional.id).where(Profesional.activo)
+            ),
         )
         .values(usado_en=momento)
     )

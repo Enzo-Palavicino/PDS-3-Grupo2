@@ -18,13 +18,21 @@ from sqlalchemy.orm import Session
 from app.canales.base import AdaptadorCanal
 from app.db import cerrar_transaccion
 from app.logs import trazas_habilitadas
-from app.modelos import EstadoMensaje, MensajeEntrante, Residente, Transcripcion
+from app.modelos import (
+    EstadoMensaje,
+    MensajeEntrante,
+    Residente,
+    TipoActor,
+    Transcripcion,
+)
 from app.nucleo import textos
+from app.nucleo.auditoria import Accion, registrar_evento
 from app.nucleo.borradores import (
     armar_borrador,
     borrador_del_mensaje,
     texto_de_respuesta,
 )
+from app.nucleo.permisos import SinAsignacion, profesional_asignado
 from app.proveedores.llm.base import ProveedorLLM
 from app.proveedores.stt.base import ProveedorSTT
 
@@ -64,6 +72,25 @@ class Contexto:
 
 
 def procesar(sesion: Session, mensaje: MensajeEntrante, contexto: Contexto) -> None:
+    try:
+        _procesar(sesion, mensaje, contexto)
+    except SinAsignacion:
+        sesion.rollback()
+        mensaje.estado = EstadoMensaje.RECHAZADO
+        registrar_evento(sesion, Accion.MENSAJE_RECHAZADO, TipoActor.SISTEMA,
+                         entidad="mensaje", entidad_id=mensaje.id,
+                         detalle={"motivo": "sin_asignacion", "canal": mensaje.canal})
+        sesion.commit()
+        try:
+            contexto.adaptadores[mensaje.canal].enviar_texto(
+                mensaje.destino_respuesta,
+                "No tienes autorización para registrar este mensaje. Solicita revisar tus asignaciones a la encargada de salud.",
+                mensaje.id_externo)
+        except Exception as error:
+            logger.warning("No se pudo notificar el rechazo del mensaje %s (%s)", mensaje.id, type(error).__name__, exc_info=trazas_habilitadas())
+
+
+def _procesar(sesion: Session, mensaje: MensajeEntrante, contexto: Contexto) -> None:
     """Hace los pasos que le faltan al mensaje. Si alguno falla, la excepción llega al worker,
     que registra el error y programa un reintento."""
     if mensaje.estado not in ESTADOS_PENDIENTES:
@@ -146,6 +173,8 @@ def _responder(
     sesion: Session, mensaje: MensajeEntrante, adaptador: AdaptadorCanal, contexto: Contexto
 ) -> None:
     borrador = borrador_del_mensaje(sesion, mensaje)
+    if borrador.residente_id is not None and not profesional_asignado(sesion, mensaje.profesional_id, borrador.residente_id):
+        raise SinAsignacion
     residente = sesion.get(Residente, borrador.residente_id) if borrador.residente_id else None
     # Si el borrador ya tiene un mensaje del bot, lo que falta ya se pidió una vez.
     ya_se_pidio = borrador.mensaje_bot_id_externo is not None

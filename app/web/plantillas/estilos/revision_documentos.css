@@ -1,0 +1,15 @@
+.dig-revision { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: var(--space-5); align-items: start; }
+.dig-revision > section { min-width: 0; }
+.dig-revision .btn { max-width: 100%; white-space: normal; text-align: center; }
+.dig-original { position: sticky; top: var(--space-4); }
+.dig-original img { width: 100%; max-height: 75vh; object-fit: contain; }
+.dig-original pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 20rem; overflow: auto; }
+.dig-grupo { margin: var(--space-5) 0; border: 1px solid var(--color-border); padding: var(--space-4); min-width: 0; }
+.dig-grupo legend { font-weight: 600; }
+.dig-fila { margin-bottom: var(--space-3); }
+.dig-campos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: var(--space-3); }
+.dig-evidencia { margin: var(--space-2) 0; padding-left: var(--space-3); border-left: 3px solid var(--color-border-strong); white-space: pre-wrap; overflow-wrap: anywhere; }
+.dig-ilegible { background: var(--color-warning-bg); color: var(--color-warning); }
+.dig-revision [hidden] { display: none !important; }
+.dig-descarte { margin-top: var(--space-6); }
+@media (max-width: 850px) { .dig-revision { grid-template-columns: 1fr; } .dig-original { position: static; } }

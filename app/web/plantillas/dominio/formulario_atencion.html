@@ -1,0 +1,123 @@
+{#- Campos del Registro de Atención (E3-01), reutilizable por la revisión de borradores (E3-02).
+    Recibe campos con el formato de app/nucleo/campos.py y faltantes con las claves de
+    atenciones.OBLIGATORIOS, para marcar lo que falta. Los nombres de los controles los lee
+    web/atenciones.campos_del_formulario. -#}
+{%- from "ui/iconos.html" import icon -%}
+
+{% macro valor(campos, clave) -%}
+{{- (campos.get(clave) or {}).get("valor") or "" -}}
+{%- endmacro %}
+
+{% macro lineas(campos, clave) -%}
+{{- (campos.get(clave) or []) | map(attribute="valor") | select | join("\n") -}}
+{%- endmacro %}
+
+{#- Fragmento de origen de un dato que extrajo la IA (vacío si se escribió a mano). -#}
+{% macro origen(dato) -%}
+{%- set fragmentos = (dato if dato is sequence and dato is not string and dato is not mapping else [dato]) | select | map(attribute="fragmento") | select | list -%}
+{%- for fragmento in fragmentos %}
+<p class="atencion-origen">{{ icon("quote", 14) }}<span><span class="visually-hidden">Fragmento de origen: </span>«{{ fragmento | con_nombres(nombres or {}) }}»</span></p>
+{%- endfor %}
+{%- endmacro %}
+
+{% macro texto(nombre, etiqueta, campos, tipo="text", requerido=False, error=False, ayuda=None, maximo=None) -%}
+<div class="field">
+  <label class="field__label" for="campo-{{ nombre }}">{{ etiqueta }}{% if requerido %} <span class="meta">(obligatorio)</span>{% endif %}</label>
+  <input class="field__control" id="campo-{{ nombre }}" name="{{ nombre }}" type="{{ tipo }}" value="{{ valor(campos, nombre) }}"
+    {%- if requerido %} required{% endif %}{% if maximo %} maxlength="{{ maximo }}"{% endif %}
+    {%- if error %} aria-invalid="true"{% endif %}{% if ayuda %} aria-describedby="campo-{{ nombre }}-ayuda"{% endif %}>
+  {%- if ayuda %}<p class="field__help" id="campo-{{ nombre }}-ayuda">{{ ayuda }}</p>{% endif %}
+  {{- origen(campos.get(nombre)) }}
+</div>
+{%- endmacro %}
+
+{% macro area(nombre, etiqueta, contenido, error=False, ayuda=None, filas=3, dato=None) -%}
+<div class="field">
+  <label class="field__label" for="campo-{{ nombre }}">{{ etiqueta }}</label>
+  <textarea class="field__control" id="campo-{{ nombre }}" name="{{ nombre }}" rows="{{ filas }}"
+    {%- if error %} aria-invalid="true"{% endif %}{% if ayuda %} aria-describedby="campo-{{ nombre }}-ayuda"{% endif %}>{{ contenido }}</textarea>
+  {%- if ayuda %}<p class="field__help" id="campo-{{ nombre }}-ayuda">{{ ayuda }}</p>{% endif %}
+  {{- origen(dato) }}
+</div>
+{%- endmacro %}
+
+{% macro fila_de_indicacion(i, numero) -%}
+{%- set i = i or {} -%}
+<fieldset class="atencion-indicacion" data-indicacion>
+  <legend>Indicación <span data-numero>{{ numero }}</span></legend>
+  <div class="atencion-grid">
+    {%- for nombre, etiqueta, tipo in [
+      ("medicamento", "Medicamento", "text"), ("dosis", "Dosis", "text"),
+      ("frecuencia_horario", "Frecuencia u horario", "text"), ("via", "Vía", "text"),
+      ("duracion", "Duración", "text"), ("fecha_inicio", "Inicio", "date"),
+      ("fecha_termino", "Término", "date")] %}
+    <div class="field">
+      <label class="field__label" for="ind-{{ nombre }}-{{ numero }}">{{ etiqueta }}</label>
+      <input class="field__control" id="ind-{{ nombre }}-{{ numero }}" name="ind_{{ nombre }}" type="{{ tipo }}" value="{{ i.get(nombre) or '' }}">
+    </div>
+    {%- endfor %}
+  </div>
+  {{- origen(i) }}
+</fieldset>
+{%- endmacro %}
+
+{% macro campos_de_atencion(campos, faltantes) -%}
+{%- set falta_motivo = "diagnostico_o_motivo" in faltantes -%}
+<fieldset class="atencion-bloque">
+  <legend>{{ icon("user") }} Contexto</legend>
+  <div class="atencion-grid">
+    {{ texto("fecha_atencion", "Fecha de atención", campos, tipo="date", requerido=True, error="fecha_atencion" in faltantes) }}
+    {{ texto("hora_atencion", "Hora", campos, tipo="time") }}
+    {{ texto("lugar", "Lugar", campos, maximo=200) }}
+  </div>
+</fieldset>
+
+<fieldset class="atencion-bloque">
+  <legend>{{ icon("stethoscope") }} Motivo y evaluación</legend>
+  <p class="field__help">Indica al menos el motivo o un diagnóstico.</p>
+  {{ texto("motivo", "Motivo de la consulta", campos, error=falta_motivo) }}
+  {{ area("diagnosticos", "Diagnósticos", lineas(campos, "diagnosticos"), error=falta_motivo, ayuda="Uno por línea.", dato=campos.get("diagnosticos")) }}
+  {{ area("evolucion_clinica", "Evolución clínica", valor(campos, "evolucion_clinica"), filas=4, dato=campos.get("evolucion_clinica")) }}
+  {{ area("observaciones", "Observaciones", valor(campos, "observaciones"), dato=campos.get("observaciones")) }}
+</fieldset>
+
+<fieldset class="atencion-bloque">
+  <legend>{{ icon("pill") }} Indicaciones</legend>
+  {%- set indicaciones = campos.get("indicaciones_farmacologicas") or [] %}
+  <div data-indicaciones>
+    {%- for i in indicaciones %}{{ fila_de_indicacion(i, loop.index) }}{% endfor %}
+    {#- Sin JavaScript quedan dos filas vacías; con JavaScript, "Agregar indicación" suma más. -#}
+    {%- for n in range(2 if indicaciones | length < 2 else 1) %}{{ fila_de_indicacion(none, indicaciones | length + loop.index) }}{% endfor %}
+  </div>
+  <template data-plantilla-indicacion>{{ fila_de_indicacion(none, "__N__") }}</template>
+  <p><button type="button" class="btn btn--neutral" data-agregar-indicacion hidden>{{ icon("pill") }}<span class="btn__label">Agregar indicación</span></button></p>
+  {{ area("otras_indicaciones", "Otras indicaciones", lineas(campos, "otras_indicaciones"), ayuda="Una por línea.", dato=campos.get("otras_indicaciones")) }}
+  {{ area("examenes_solicitados", "Exámenes solicitados", lineas(campos, "examenes_solicitados"), ayuda="Uno por línea.", dato=campos.get("examenes_solicitados")) }}
+</fieldset>
+
+<fieldset class="atencion-bloque">
+  <legend>{{ icon("calendar") }} Seguimiento</legend>
+  {%- set control = campos.get("proximo_control") or {} %}
+  {%- set acompanante = campos.get("acompanante") or {} %}
+  <div class="atencion-grid">
+    <div class="field">
+      <label class="field__label" for="campo-control_fecha">Próximo control</label>
+      <input class="field__control" id="campo-control_fecha" name="control_fecha" type="date" value="{{ control.get('fecha') or '' }}">
+    </div>
+    <div class="field">
+      <label class="field__label" for="campo-control_descripcion">Descripción del control</label>
+      <input class="field__control" id="campo-control_descripcion" name="control_descripcion" type="text" value="{{ control.get('descripcion') or '' }}">
+    </div>
+    <div class="field">
+      <label class="field__label" for="campo-acompanante_nombre">Acompañante: nombre</label>
+      <input class="field__control" id="campo-acompanante_nombre" name="acompanante_nombre" type="text" value="{{ acompanante.get('nombre') or '' }}">
+    </div>
+    <div class="field">
+      <label class="field__label" for="campo-acompanante_cargo">Acompañante: cargo</label>
+      <input class="field__control" id="campo-acompanante_cargo" name="acompanante_cargo" type="text" value="{{ acompanante.get('cargo') or '' }}">
+    </div>
+  </div>
+  {{- origen(campos.get("proximo_control")) }}
+  {{- origen(campos.get("acompanante")) }}
+</fieldset>
+{%- endmacro %}

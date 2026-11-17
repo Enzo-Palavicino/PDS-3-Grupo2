@@ -1,16 +1,34 @@
 """Utilidades para los tests del núcleo: residentes de prueba, y un canal y un proveedor de
 transcripción falsos."""
 
+from datetime import date
+
 import pytest
+from sqlalchemy import select
 
 from app.canales.base import AdaptadorCanal
-from app.modelos import MensajeEntrante, Residente
+from app.modelos import Asignacion, MensajeEntrante, Residente, UsuarioWeb
+from app.nucleo.documentos import subir_documento
 from app.nucleo.mensajes import registrar_mensaje_entrante
 from app.nucleo.procesamiento import Contexto
 from app.proveedores.llm.fake import ProveedorLLMFake
 from app.proveedores.stt.base import ProveedorSTT, ResultadoTranscripcion
 from app.proveedores.stt.fake import ProveedorSTTFake
-from scripts.sembrar_datos import RESIDENTES
+from scripts.sembrar_datos import RESIDENTES, sembrar
+from tests.web.test_web_adjuntos import PNG
+
+
+@pytest.fixture
+def crear_documento(sesion):
+    sembrar(sesion, "clave-de-prueba")
+    usuario = sesion.scalar(select(UsuarioWeb).where(UsuarioWeb.usuario == "encargada_salud"))
+    sesion.commit()
+
+    def crear(fecha=date(2026, 8, 12), contenido=PNG):
+        documento = subir_documento(sesion, 2, contenido, "original", "Registro", usuario, fecha)
+        sesion.commit()
+        return documento
+    return crear
 
 
 @pytest.fixture
@@ -112,9 +130,11 @@ def contexto(canal_falso, tmp_path) -> Contexto:
 
 
 @pytest.fixture
-def residentes_guardados(sesion, residentes) -> list[Residente]:
+def residentes_guardados(sesion, residentes, profesional) -> list[Residente]:
     """Los 4 residentes de la demo, guardados en la base de datos del test."""
     sesion.add_all(residentes)
+    sesion.flush()
+    sesion.add_all([Asignacion(residente_id=r.id, profesional_id=profesional.id) for r in residentes])
     sesion.commit()
     return residentes
 

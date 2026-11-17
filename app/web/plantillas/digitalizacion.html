@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% from "ui/formularios.html" import csrf_field, field %}
+{% from "ui/encabezados.html" import page_header %}
+{% from "ui/avisos.html" import alert %}
+{% block titulo %}Digitalización{% endblock %}
+{% block contenido %}
+{{ page_header("Incorporar documentos antiguos", "Selecciona al residente, carga sus documentos y consulta el avance de cada documento.") }}
+<style>{% include "estilos/digitalizacion.css" %}</style>
+<div id="flujo-digitalizacion" data-inicio="{{ 4 if exito else 2 if residente else 1 }}">
+<ol class="dig-etapas" aria-label="Etapas de digitalización">
+{% for nombre in ["Seleccionar residente", "Confirmar identidad", "Cargar documentos", "Seguimiento", "Revisar e incorporar"] %}
+<li data-indicador="{{ loop.index }}"><span class="dig-numero">{{ loop.index }}</span><span>{{ nombre }}</span></li>
+{% endfor %}
+</ol>
+{% if exito %}{% call alert("success", role="status") %}{{ exito }}{% endcall %}{% endif %}
+{% if error %}{% call alert("danger", role="alert") %}{{ error }} No se guardó ningún archivo de esta carga. Vuelve a seleccionar los archivos.{% endcall %}{% endif %}
+<section data-etapa="1">
+<h2 tabindex="-1">1. Selecciona al residente</h2>
+
+<form class="card res-panel" method="get" action="/digitalizacion">
+<label class="field__label" for="residente-digitalizacion">Residente</label>
+<select class="field__control" name="residente_id" id="residente-digitalizacion" required>
+<option value="" disabled{% if not residente %} selected{% endif %}>Selecciona un residente</option>
+{% for r in residentes %}<option value="{{ r.id }}"{% if residente and r.id == residente.id %} selected{% endif %}>{{ r.codigo }} · {{ r.nombres }} {{ r.apellidos }}{% if r.apodo %} · {{ r.apodo }}{% endif %}</option>{% endfor %}
+</select><div class="res-actions"><button class="btn btn--primary"{% if not residentes %} disabled{% endif %}>Continuar</button></div>
+{% if not residentes %}<p>Primero registra un residente en la sección Residentes.</p>{% endif %}
+</form></section>
+{% if residente %}
+<section class="card res-panel" aria-labelledby="identidad-documentos"><h2 id="identidad-documentos">{{ residente.codigo }} · {{ residente.nombres }} {{ residente.apellidos }}</h2>
+<p>Fecha de nacimiento: {{ residente.fecha_nacimiento }} · Estado: {{ residente.estado }}{% if residente.apodo %} · Apodo: {{ residente.apodo }}{% endif %}</p>
+<form method="post" action="/digitalizacion" enctype="multipart/form-data" data-enviando="Subiendo…">
+{{ csrf_field(csrf) }}<input type="hidden" name="residente_id" value="{{ residente.id }}">
+<div data-etapa="2"><h2 tabindex="-1">2. Confirma la identidad</h2><p>Comprueba que todos los documentos pertenecen a este residente antes de continuar.</p>
+<p><label><input id="confirmar-identidad" type="checkbox" name="confirmar_identidad" value="true" required> Confirmo que los documentos corresponden a {{ residente.nombres }} {{ residente.apellidos }} ({{ residente.codigo }}).</label></p>
+<div class="res-actions dig-js"><button class="btn btn--neutral" type="button" data-ir="1">Anterior</button><button class="btn btn--primary" type="button" id="confirmar-continuar">Confirmar y continuar</button></div>
+</div><div data-etapa="3" class="dig-formulario"><h2 tabindex="-1">3. Carga los documentos</h2>
+<div class="dig-metadatos">
+{{ field("tipo_documento", "Tipo de documento", required=True, value=valores.get("tipo_documento", ""), help="Por ejemplo: registro de atención, receta o examen.") }}
+{{ field("fecha_original", "Fecha original (opcional)", type="date", value=valores.get("fecha_original", ""), help="Déjala vacía si no se conoce.") }}
+<div class="field dig-carga" id="zona-imagenes"><label class="field__label" for="imagenes-historicas">Selecciona o arrastra tus documentos aquí</label><input class="field__control" id="imagenes-historicas" type="file" name="archivos" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" multiple required aria-describedby="limites-imagenes"><p class="field__help" id="limites-imagenes">JPG, PNG o PDF de una página · Hasta 10 archivos · 10 MB por archivo · 50 MB por lote.</p></div>
+</div>
+<ul id="archivos-seleccionados" class="dig-archivos"></ul><p id="resumen-archivos" role="status"></p>
+<p class="field__help dig-nota">El tipo y la fecha se aplican a todo el lote. Si son diferentes, realiza cargas separadas.</p>
+<div class="res-actions"><button class="btn btn--neutral dig-js" type="button" data-ir="2">Anterior</button><button class="btn btn--primary">Subir documentos</button></div></div>
+</form></section>
+<section data-etapa="4" aria-labelledby="documentos-historicos" data-documentos-residente="{{ residente.id }}">
+<h2 id="documentos-historicos" tabindex="-1">4. Seguimiento del procesamiento</h2>
+<p>{{ residente.codigo }} · {{ residente.nombres }} {{ residente.apellidos }}</p>
+<p id="actualizacion-documentos" role="status">Los estados se actualizan automáticamente cada 5 segundos.</p>
+<noscript><p>Activa JavaScript para actualizar los estados automáticamente.</p></noscript>
+<p><a href="/digitalizacion?residente_id={{ residente.id }}" id="actualizar-documentos">Actualizar estados</a></p>
+<div class="card res-scroll"><table class="res-table"><thead><tr><th scope="col">Documento</th><th scope="col">Tipo</th><th scope="col">Fecha original</th><th scope="col">Estado</th><th scope="col">Intentos</th><th scope="col">Archivo</th><th scope="col">Revisión</th></tr></thead>
+<tbody id="filas-documentos">
+{% for d in documentos %}<tr data-documento-id="{{ d.id }}"><th scope="row">{{ d.nombre }}</th><td>{{ d.tipo }}</td><td>{{ d.fecha }}</td><td>{{ d.estado }}</td><td>{{ d.intentos }}</td><td><a href="/adjuntos/{{ d.adjunto_id }}/descargar">Descargar original</a></td><td><a href="/digitalizacion/{{ d.id }}">{{ "Revisar" if d.estado == "Por revisar" else "Ver documento" }}</a></td></tr>
+{% else %}<tr data-vacio><td colspan="7">Todavía no hay documentos históricos para este residente.</td></tr>{% endfor %}
+</tbody></table></div>
+<p>Abre «Revisar» para comparar los datos con el original antes de incorporarlos a la ficha.</p>
+<div class="res-actions dig-js"><button class="btn btn--neutral" type="button" data-nuevo-lote data-ir="2">Cargar otro lote</button><button class="btn btn--neutral" type="button" data-ir="1">Cambiar residente</button></div>
+</section>
+<p class="dig-js" id="acceso-seguimiento"><button class="btn btn--neutral" type="button" data-ir="4">Ver documentos y seguimiento</button></p>
+{% endif %}
+</div>
+<script>{% include "scripts/digitalizacion_flujo.js" %}</script>
+{% if residente %}<script>{% include "scripts/digitalizacion.js" %}</script>{% endif %}
+{% endblock %}

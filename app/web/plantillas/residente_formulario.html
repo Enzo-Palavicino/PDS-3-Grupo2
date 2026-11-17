@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% from "ui/formularios.html" import field, select, csrf_field %}
+{% from "ui/encabezados.html" import page_header %}
+{% from "ui/avisos.html" import alert %}
+{% block titulo %}{{ "Editar residente" if residente else "Registrar residente" }}{% endblock %}
+{% block contenido %}
+{{ page_header("Editar residente · " ~ residente.codigo if residente else "Registrar residente", "Datos administrativos.") }}
+<p><a href="/residentes">Volver a residentes</a></p>
+{% if error %}{% call alert("danger", role="alert") %}{{ error }}{% endcall %}{% endif %}
+{% if duplicados %}{% call alert("warning", role="alert") %}
+Ya existe un residente con el mismo nombre completo y fecha de nacimiento. Revisa su ficha antes de crear otro registro:
+<ul>{% for otro in duplicados %}<li><a href="/residentes/{{ otro.id }}/editar">{{ otro.codigo }} · {{ otro.nombres }} {{ otro.apellidos }}</a> ({{ otro.estado }}).{% if otro.estado == 'egresado' %} Puedes registrar su reingreso en la misma ficha.{% endif %}</li>{% endfor %}</ul>
+{% endcall %}{% endif %}
+<form class="card res-panel" method="post" action="{{ '/residentes/' ~ residente.id ~ '/editar' if residente else '/residentes/nuevo' }}" data-enviando="Guardando…">
+{{ csrf_field(csrf) }}
+<div class="res-grid">
+{{ field("nombres", "Nombres", required=True, value=valores.get("nombres", "")) }}
+{{ field("apellidos", "Apellidos", required=True, value=valores.get("apellidos", "")) }}
+{{ field("apodo", "Apodo (opcional)", value=valores.get("apodo", "")) }}
+{{ field("fecha_nacimiento", "Fecha de nacimiento", type="date", required=True, value=valores.get("fecha_nacimiento", "")) }}
+{{ select("nivel", "Nivel", [("", "Selecciona un nivel")] + niveles, selected=valores.get("nivel", "")) }}
+{{ field("fecha_ingreso", "Fecha de ingreso inicial", type="date", required=True, value=valores.get("fecha_ingreso", "")) }}
+</div>
+{% if not residente %}
+<fieldset class="res-asignaciones">
+<legend>Profesionales asignados (opcional)</legend>
+<p>Puedes seleccionar uno o varios profesionales, o asignarlos después.</p>
+{% if profesionales %}
+<div id="profesionales-seleccionados">
+{% for elegido in seleccionados or [none] %}
+<div class="res-profesional-selector">
+<label class="field"> <span class="field__label">Profesional</span>
+<select class="field__control" name="profesionales_ids">
+<option value="" disabled{% if elegido is none %} selected{% endif %}>Selecciona un profesional (opcional)</option>
+{% for profesional in profesionales %}<option value="{{ profesional.id }}"{% if profesional.id == elegido %} selected{% endif %}>{{ profesional.nombre }} · {{ profesional.especialidad }}</option>{% endfor %}
+</select></label>
+<button class="btn btn--neutral res-quitar-profesional" type="button">Quitar</button>
+</div>
+{% endfor %}
+</div>
+<button class="btn btn--neutral" type="button" id="agregar-profesional">Agregar otro profesional</button>
+<script>
+(() => {
+  const lista = document.getElementById('profesionales-seleccionados');
+  const plantilla = lista.firstElementChild.cloneNode(true);
+  document.getElementById('agregar-profesional').addEventListener('click', () => {
+    const fila = plantilla.cloneNode(true);
+    fila.querySelector('select').selectedIndex = 0;
+    lista.appendChild(fila);
+    fila.querySelector('select').focus();
+  });
+  lista.addEventListener('click', event => {
+    const boton = event.target.closest('.res-quitar-profesional');
+    if (boton) {
+      boton.closest('.res-profesional-selector').remove();
+      document.getElementById('agregar-profesional').focus();
+    }
+  });
+})();
+</script>
+{% else %}<p>No hay profesionales activos disponibles. Podrás asignarlos posteriormente.</p>{% endif %}
+</fieldset>
+{% endif %}
+{% if duplicados %}<p><label><input type="checkbox" name="confirmar_duplicado" value="true" required> Revisé las coincidencias y confirmo que corresponde guardar estos datos.</label></p>{% endif %}
+<div class="res-actions"><button class="btn btn--primary">{{ "Guardar cambios" if residente else "Crear residente" }}</button><a class="btn btn--neutral" href="/residentes">Cancelar</a></div>
+</form>
+{% if residente %}
+<p><a class="btn btn--neutral" href="/residentes/{{ residente.id }}/asignaciones">Administrar profesionales asignados</a></p>
+<section class="card res-panel" aria-labelledby="estado-residente"><h2 id="estado-residente">{{ "Registrar egreso" if residente.estado == "activo" else "Registrar reingreso" }}</h2>
+<p>Estado actual: {{ residente.estado }}.{% if residente.fecha_egreso %} Último egreso: {{ residente.fecha_egreso }}.{% endif %} Se conservarán el código, el ingreso inicial y todos los registros anteriores.</p>
+<form method="post" action="/residentes/{{ residente.id }}/estado" data-enviando="Guardando…"
+ data-confirm-title="¿Confirmar el cambio de estado?" data-confirm-body="Se conservará el historial del residente." data-confirm-label="Confirmar" onsubmit="return confirm(this.dataset.confirmTitle)">
+{{ csrf_field(csrf) }}<input type="hidden" name="accion" value="{{ 'egresar' if residente.estado == 'activo' else 'reingresar' }}">
+{{ field("fecha", "Fecha de egreso" if residente.estado == "activo" else "Fecha de reingreso", type="date", required=True, value=hoy) }}
+<div class="res-actions"><button class="btn btn--neutral">{{ "Registrar egreso" if residente.estado == "activo" else "Reactivar la misma ficha" }}</button></div>
+</form></section>
+{% endif %}
+{% endblock %}

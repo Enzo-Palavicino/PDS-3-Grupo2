@@ -7,7 +7,8 @@ from app.db import ahora
 from app.modelos import EstadoMensaje, EventoAuditoria, MensajeEntrante, TipoActor
 from app.nucleo import textos
 from app.nucleo.worker import MAXIMO_INTENTOS, Worker
-from app.proveedores.llm.base import ProveedorLLM, ResultadoLLM
+from app.proveedores.llm.base import ResultadoLLM
+from app.proveedores.llm.fake import ProveedorLLMFake
 
 
 def leer(fabrica_de_sesiones, mensaje_id: int) -> MensajeEntrante:
@@ -114,13 +115,14 @@ def test_si_falla_el_envio_de_la_respuesta_el_reintento_no_vuelve_a_llamar_a_la_
     assert len(canal_falso.enviados) == 1
 
 
-class LLMQueEsperaMientrasOtrosEscriben(ProveedorLLM):
+class LLMQueEsperaMientrasOtrosEscriben(ProveedorLLMFake):
     """Mientras la IA "piensa", otra parte de la aplicación escribe en la base de datos (por
     ejemplo, la web guarda un evento de auditoría)."""
 
     nombre = "fake"
 
     def __init__(self, fabrica_de_sesiones):
+        super().__init__()
         self._fabrica = fabrica_de_sesiones
 
     def generar_json(self, instrucciones, entrada, esquema):

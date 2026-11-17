@@ -1,5 +1,7 @@
 from datetime import timedelta
 
+import pytest
+
 from app.db import ahora
 from app.modelos import EstadoBorrador
 
@@ -59,6 +61,53 @@ def test_abrir_un_borrador_queda_en_la_auditoria(cliente, entrar, crear_borrador
     cliente.get(f"/borradores/{borrador.id}")
 
     assert acciones()[-1] == "borrador_leido"
+
+
+def test_un_borrador_antiguo_muestra_antecedentes_vacios(cliente, entrar, crear_borrador):
+    borrador = crear_borrador("pediatra")
+    entrar("pediatra")
+
+    respuesta = cliente.get(f"/borradores/{borrador.id}")
+
+    assert respuesta.status_code == 200
+    for etiqueta in ("Alergias", "Peso y talla", "Vacunas", "Hospitalizaciones"):
+        assert etiqueta in respuesta.text
+
+
+@pytest.mark.parametrize(
+    "mediciones,valores",
+    [
+        ({"peso_kg": 9.8, "talla_cm": 74}, ["Peso: 9.8 kg", "Talla: 74 cm"]),
+        ({"peso_kg": 9.8, "talla_cm": None}, ["Peso: 9.8 kg"]),
+        ({"peso_kg": None, "talla_cm": 74}, ["Talla: 74 cm"]),
+    ],
+)
+def test_el_detalle_muestra_antecedentes_mediciones_y_fragmentos(
+    cliente, entrar, crear_borrador, sesion, mediciones, valores
+):
+    borrador = crear_borrador("pediatra")
+    borrador.campos = borrador.campos | {
+        "alergias": [{"valor": "Látex", "fragmento": "alergia registrada al látex"}],
+        "mediciones": mediciones | {"fragmento": "medición antropométrica de hoy"},
+        "vacunas": [{"valor": "Influenza", "fragmento": "recibió vacuna de influenza"}],
+        "hospitalizaciones": [{
+            "valor": "Neumonía en julio de 2026",
+            "fragmento": "hospitalización previa por neumonía",
+        }],
+    }
+    sesion.commit()
+    entrar("pediatra")
+
+    respuesta = cliente.get(f"/borradores/{borrador.id}")
+
+    assert respuesta.status_code == 200
+    for valor in [*valores, "Látex", "Influenza", "Neumonía en julio de 2026"]:
+        assert valor in respuesta.text
+    for nombre in ("alergias", "mediciones", "vacunas", "hospitalizaciones"):
+        dato = borrador.campos[nombre]
+        fragmento = dato[0]["fragmento"] if isinstance(dato, list) else dato["fragmento"]
+        assert fragmento in respuesta.text
+    assert "None kg" not in respuesta.text and "None cm" not in respuesta.text
 
 
 def test_un_profesional_no_puede_abrir_un_borrador_ajeno(cliente, entrar, crear_borrador):

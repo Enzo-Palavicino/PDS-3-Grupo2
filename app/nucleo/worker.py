@@ -1,4 +1,4 @@
-"""Worker: procesa en segundo plano los mensajes que guardó la ingesta.
+"""Worker: procesa en segundo plano mensajes y documentos históricos.
 
 La tabla mensajes_entrantes funciona como cola. El worker toma los mensajes pendientes en orden
 de llegada y los procesa de a uno, en un hilo aparte, para que recibir mensajes nunca tenga que
@@ -11,15 +11,27 @@ import logging
 import threading
 from datetime import timedelta
 
+from openai import OpenAIError
 from sqlalchemy import or_, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.canales.base import ErrorDeCanal
 from app.db import ahora
 from app.logs import trazas_habilitadas
-from app.modelos import EstadoMensaje, MensajeEntrante
+from app.modelos import (
+    DocumentoHistorico,
+    EstadoDocumento,
+    EstadoMensaje,
+    MensajeEntrante,
+)
 from app.nucleo import textos
+from app.nucleo.adjuntos import ArchivoNoPermitido
+from app.nucleo.digitalizacion import ESTADOS_PENDIENTES as ESTADOS_DOCUMENTOS
+from app.nucleo.digitalizacion import procesar_documento
+from app.nucleo.extraccion import ErrorExtraccion
 from app.nucleo.procesamiento import ESTADOS_PENDIENTES, Contexto, procesar
+from app.proveedores.llm.base import ErrorLLM
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +74,8 @@ class Worker:
 
     def ejecutar(self) -> None:
         """Procesa la cola hasta que se llame a detener()."""
-        self._borrar_audios_de_intentos_interrumpidos()
+        if self._contexto.adaptadores:
+            self._borrar_audios_de_intentos_interrumpidos()
         while not self._detenido.is_set():
             self._hay_trabajo.clear()
             try:
@@ -79,13 +92,53 @@ class Worker:
                 self._hay_trabajo.wait(self._intervalo_seg)
 
     def procesar_pendientes(self) -> int:
-        """Procesa una vez cada mensaje pendiente y devuelve cuántos había."""
+        """Procesa una vez cada mensaje y documento pendiente y devuelve cuántos había."""
         ids = self._ids_pendientes()
+        documentos = self._ids_documentos_pendientes()
         for mensaje_id in ids:
             if self._detenido.is_set():
                 break
             self._procesar(mensaje_id)
-        return len(ids)
+        for documento_id in documentos:
+            if self._detenido.is_set():
+                break
+            self._procesar_documento(documento_id)
+        return len(ids) + len(documentos)
+
+    def _ids_documentos_pendientes(self) -> list[int]:
+        consulta = select(DocumentoHistorico.id).where(
+            DocumentoHistorico.estado.in_(ESTADOS_DOCUMENTOS),
+            or_(
+                DocumentoHistorico.proximo_intento_en.is_(None),
+                DocumentoHistorico.proximo_intento_en <= ahora(),
+            ),
+        ).order_by(DocumentoHistorico.id)
+        with self._fabrica() as sesion:
+            return list(sesion.scalars(consulta))
+
+    def _procesar_documento(self, documento_id: int) -> None:
+        try:
+            with self._fabrica() as sesion:
+                procesar_documento(sesion, documento_id, self._contexto.llm)
+        except (
+            ErrorLLM, ErrorExtraccion, OpenAIError, ArchivoNoPermitido,
+            SQLAlchemyError, OSError, ValueError, LookupError, RuntimeError,
+        ) as error:
+            # Tampoco en DEBUG: una excepción del proveedor puede contener el documento.
+            logger.warning("Falló el documento %s (%s)", documento_id, type(error).__name__)
+            with self._fabrica.begin() as sesion:
+                documento = sesion.get(DocumentoHistorico, documento_id)
+                if documento is None:
+                    logger.error("No se puede registrar el fallo del documento %s: no existe", documento_id)
+                    return
+                documento.intentos += 1
+                documento.ultimo_error = type(error).__name__
+                if documento.intentos >= MAXIMO_INTENTOS:
+                    documento.estado = EstadoDocumento.ERROR
+                    documento.proximo_intento_en = None
+                    logger.error("Documento %s en error tras %s intentos", documento_id, MAXIMO_INTENTOS)
+                else:
+                    documento.proximo_intento_en = ahora() + ESPERAS_ENTRE_INTENTOS[documento.intentos - 1]
 
     def _ids_pendientes(self) -> list[int]:
         consulta = (

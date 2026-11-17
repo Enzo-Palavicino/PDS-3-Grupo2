@@ -103,6 +103,7 @@ Render, `render.yaml` fija las que no son secretas, y los secretos se ingresan e
 | `DIAS_SIN_ACTIVIDAD_BORRADOR` | Días sin cambios tras los que un borrador pendiente aparece "sin actividad" | `30` | El valor por defecto |
 | `DATABASE_URL` | Base de datos | `sqlite:///./data/app.db` | La de PostgreSQL de Render |
 | `SEED_PASSWORD` | Contraseña de los usuarios de demostración. **Secreto** | — | Se ingresa en el panel |
+| `SEED_DEMO` | Carga además la ficha de la demo de la entrega 2: asignaciones, antecedentes, mediciones y atenciones firmadas | `false` | `true` para la demo |
 | `STT_PROVIDER` y `STT_MODEL` | Transcripción de audios: `fake` u `openai`, y el modelo | `fake` y `gpt-transcribe` | `openai` |
 | `AUDIO_DIR` | Carpeta donde está cada audio mientras se transcribe | La carpeta temporal del sistema | El valor por defecto |
 | `LLM_PROVIDER` y `LLM_MODEL` | Extracción con IA: `fake` u `openai`, y el modelo | `fake` y `gpt-6-luna` | `openai` |
@@ -237,6 +238,12 @@ datos, o un modelo local como Whisper. En desarrollo y en la demo se usan solo d
 Un LLM convierte el texto libre del registro (escrito o transcrito) en los campos del "Registro
 de Atención y Control de Salud": residente, fecha, lugar, motivo, diagnósticos, indicaciones,
 próximo control, acompañante, etc. Cada campo trae el fragmento del texto que lo respalda.
+
+También reconoce alergias, vacunas, hospitalizaciones y mediciones de peso (kg) y talla (cm).
+Las mediciones son números positivos con su fragmento; si solo se informa una, la otra queda
+vacía. La vista del borrador muestra estos antecedentes junto a su evidencia, incluso cuando un
+borrador antiguo no los contiene. No se agregan nuevos campos obligatorios para completar la
+atención. Al firmarla, los antecedentes pasan a la ficha mediante el servicio de incorporación.
 
 1. **Seudonimización** (`app/nucleo/seudonimizacion.py`): los nombres, apellidos y apodos de los
    residentes se reemplazan por su código (`[RES-02]`), sin importar mayúsculas ni tildes y

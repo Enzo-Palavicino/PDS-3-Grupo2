@@ -15,6 +15,7 @@
 {% macro draft_status(borrador, inactivo=False, size=None) -%}
 <span class="badge-group">
   {%- if borrador.estado == "descartado" %}{{ badge("Descartado", "discarded", "x", size) }}
+  {%- elif borrador.estado == "confirmado" %}{{ badge("Confirmado", "info", "circle-check", size) }}
   {%- else %}{{ badge("Pendiente", "pending", size=size) }}{% endif %}
   {%- if inactivo %}{{ badge("Sin actividad", "inactive", "hourglass", size, clase="etiqueta sin-actividad") }}{% endif -%}
 </span>

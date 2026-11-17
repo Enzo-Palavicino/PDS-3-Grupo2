@@ -2,16 +2,18 @@
 
 import os
 import shutil
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
+from io import BytesIO
 from pathlib import Path
 
+import pypdfium2 as pdfium
 import pytest
 from alembic import command
 from alembic.config import Config as ConfigAlembic
 
 from app.canales.base import MensajeNormalizado
 from app.db import crear_fabrica_de_sesiones, crear_motor
-from app.modelos import Profesional
+from app.modelos import Nivel, Profesional, Residente
 
 # Los tests nunca se conectan a Telegram ni a OpenAI, aunque el .env local esté configurado
 # para hacerlo: las variables de entorno tienen prioridad sobre .env.
@@ -21,6 +23,18 @@ os.environ["STT_PROVIDER"] = "fake"
 os.environ["LLM_PROVIDER"] = "fake"
 
 RAIZ = Path(__file__).resolve().parent.parent
+
+
+@pytest.fixture
+def crear_pdf():
+    def crear(paginas=1, ancho=612, alto=792):
+        with pdfium.PdfDocument.new() as pdf:
+            for _ in range(paginas):
+                pdf.new_page(ancho, alto).close()
+            salida = BytesIO()
+            pdf.save(salida)
+            return salida.getvalue()
+    return crear
 
 
 def configuracion_alembic(url: str) -> ConfigAlembic:
@@ -81,6 +95,20 @@ def profesional(sesion) -> Profesional:
     sesion.add(profesional)
     sesion.commit()
     return profesional
+
+
+@pytest.fixture
+def residente(sesion) -> Residente:
+    residente = Residente(
+        codigo="RES-01",
+        nombres="Tomás",
+        apellidos="Rivas",
+        fecha_nacimiento=date(2023, 7, 14),
+        nivel=Nivel.HETEROGENEO,
+    )
+    sesion.add(residente)
+    sesion.commit()
+    return residente
 
 
 @pytest.fixture

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{%- from "ui/encabezados.html" import page_header, back_link -%}
+{%- from "ui/avisos.html" import alert -%}
+{%- from "ui/formularios.html" import csrf_field, select -%}
+{%- from "dominio/formulario_atencion.html" import campos_de_atencion -%}
+{#- Nueva atención desde la web (E3-01). Queda en borrador y lleva a la pantalla de firma. -#}
+{%- set nombre = residente.nombres ~ " " ~ residente.apellidos -%}
+{% block titulo %}Nueva atención · {{ nombre }}{% endblock %}
+{% block clase_main %}page page--detail{% endblock %}
+{% block contenido %}
+{{ back_link("/residentes/" ~ residente.id, "Ficha de " ~ nombre) }}
+{{ page_header("Nueva atención", "Registro de Atención y Control de Salud de " ~ nombre ~ ". Se guarda en borrador; después la revisas y la firmas.") }}
+
+{%- if errores %}
+{% call alert("danger", title="No se guardó la atención", role="alert") %}
+{%- for error in errores %}{{ error }}{% if not loop.last %}<br>{% endif %}{% endfor %}
+{%- endcall %}
+{%- endif %}
+
+<form class="card atencion-form" method="post" action="/atenciones/nueva" enctype="multipart/form-data" data-enviando="Guardando…">
+  {{ csrf_field(csrf) }}
+  <input type="hidden" name="residente_id" value="{{ residente.id }}">
+  {{ campos_de_atencion(campos, faltantes) }}
+
+  <fieldset class="atencion-bloque">
+    <legend>Adjuntos (opcional)</legend>
+    <div class="atencion-grid">
+      <div class="field">
+        <label class="field__label" for="campo-archivos">Archivos</label>
+        <input class="field__control" id="campo-archivos" name="archivos" type="file" multiple
+          accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" aria-describedby="campo-archivos-ayuda">
+        <p class="field__help" id="campo-archivos-ayuda">PDF, JPG o PNG, hasta 10 MB cada uno.{% if errores %} Si ya los habías elegido, vuelve a seleccionarlos.{% endif %}</p>
+      </div>
+      {{ select("tipo_adjunto", "Tipo de documento", tipos_de_adjunto, selected=valores_extra.get("tipo_adjunto") or "receta") }}
+      <div class="field">
+        <label class="field__label" for="campo-emisor">Emisor (opcional)</label>
+        <input class="field__control" id="campo-emisor" name="emisor" type="text" maxlength="200" value="{{ valores_extra.get('emisor') or '' }}">
+      </div>
+    </div>
+  </fieldset>
+
+  <div class="atencion-confirmacion">
+    <input id="confirmo-identidad" name="confirmo_identidad" type="checkbox" value="{{ residente.id }}" required>
+    <label for="confirmo-identidad">Confirmo que la atención es de <strong>{{ nombre }}</strong>, {{ edad }} <span class="code">{{ residente.codigo }}</span>.</label>
+  </div>
+  <p class="actions">
+    <button class="btn btn--primary">Guardar en borrador</button>
+    <a class="btn btn--neutral" href="/residentes/{{ residente.id }}">Cancelar</a>
+  </p>
+</form>
+<script>{% include "scripts/formulario_atencion.js" %}</script>
+{% endblock %}

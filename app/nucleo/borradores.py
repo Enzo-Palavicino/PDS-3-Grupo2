@@ -6,6 +6,7 @@ pendiente suyo, cada mensaje crea uno nuevo.
 """
 
 import logging
+import re
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -24,7 +25,10 @@ from app.modelos import (
     Transcripcion,
 )
 from app.nucleo import textos
+from app.nucleo.campos import ETIQUETAS_ANTECEDENTES
 from app.nucleo.extraccion import RegistroExtraido, extraer_registro
+from app.nucleo.permisos import SinAsignacion, profesional_asignado
+from app.nucleo.seudonimizacion import seudonimizar
 from app.proveedores.llm.base import ProveedorLLM
 
 logger = logging.getLogger(__name__)
@@ -39,6 +43,7 @@ CAMPOS_CLINICOS = (
     "otras_indicaciones",
     "examenes_solicitados",
     "proximo_control",
+    *ETIQUETAS_ANTECEDENTES,
 )
 
 
@@ -48,10 +53,16 @@ def armar_borrador(
     """Extrae los campos del mensaje y los guarda en un borrador: el que el mensaje completa, si
     le responde al bot, o uno nuevo. Devuelve None si el mensaje era una consulta."""
     existente = borrador_al_que_responde(sesion, mensaje)
+    if existente and existente.residente_id is not None and not profesional_asignado(
+        sesion, mensaje.profesional_id, existente.residente_id
+    ):
+        raise SinAsignacion
     textos_previos = textos_del_borrador(sesion, existente) if existente else []
     texto_nuevo = texto_del_mensaje(sesion, mensaje)
     profesional = sesion.get(Profesional, mensaje.profesional_id)
     residentes = list(sesion.scalars(select(Residente).order_by(Residente.codigo)))
+    texto_completo = "\n".join([*textos_previos, texto_nuevo])
+    comprobar_asignaciones(sesion, mensaje.profesional_id, texto_completo, residentes)
     # La IA tarda varios segundos: la transacción se cierra antes de llamarla.
     cerrar_transaccion(sesion)
     resultado = extraer_registro(
@@ -62,6 +73,10 @@ def armar_borrador(
         llm,
     )
 
+    # Se vuelve a consultar después de la llamada externa: la asignación pudo retirarse.
+    comprobar_asignaciones(sesion, mensaje.profesional_id, texto_completo, residentes)
+    if resultado.residente_id is not None and not profesional_asignado(sesion, mensaje.profesional_id, resultado.residente_id):
+        raise SinAsignacion
     if existente is None and es_consulta(texto_nuevo, resultado.registro):
         logger.info("El mensaje %s es una consulta: no se crea borrador", mensaje.id)
         return None
@@ -219,3 +234,17 @@ def texto_de_respuesta(
 def iniciales(residente: Residente) -> str:
     """Iniciales del residente: "Emilia Soto" da "E. S."."""
     return f"{residente.nombres[0]}. {residente.apellidos[0]}."
+
+
+def comprobar_asignaciones(sesion, profesional_id, texto, residentes):
+    """Todas las menciones conocidas, incluso ambiguas, requieren asignación.
+
+    Conserva el catálogo completo para seudonimizar: filtrar residentes antes de esta
+    etapa podría enviar al LLM nombres de personas no asignadas sin ocultarlos.
+    Los textos sin identidad conocida quedan pendientes, nunca una atención confirmada.
+    """
+    codigos = {c for m in seudonimizar(texto, residentes).menciones for c in m.codigos}
+    codigos.update(re.findall(r"\bRES-\d+\b", texto.upper()))
+    for residente in residentes:
+        if residente.codigo in codigos and not profesional_asignado(sesion, profesional_id, residente.id):
+            raise SinAsignacion

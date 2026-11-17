@@ -23,10 +23,19 @@ services:
         value: webhook
       - key: TELEGRAM_DELETE_INCOMING
         value: "true"
-      # Para habilitar WhatsApp, cambia a true y agrega las variables de Kapso en Environment.
-      # Ver docs/whatsapp-kapso.md; no se requieren si está apagado.
+      # WhatsApp por Kapso (ver docs/whatsapp-kapso.md). Sus secretos se ingresan en el panel
+      # (sync: false): Render no los sobrescribe al sincronizar este archivo.
       - key: WHATSAPP_ENABLED
-        value: "false"
+        value: "true"
+      - key: KAPSO_API_KEY
+        sync: false
+      - key: KAPSO_PHONE_NUMBER_ID
+        sync: false
+      - key: KAPSO_WEBHOOK_SECRET
+        sync: false
+      # Número del bot, con código de país y sin "+": arma el enlace de vinculación wa.me.
+      - key: WHATSAPP_PHONE_NUMBER
+        sync: false
       - key: STT_PROVIDER
         value: openai
       - key: LLM_PROVIDER

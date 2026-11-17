@@ -24,13 +24,29 @@ from app.canales.whatsapp.cliente import ClienteKapso
 from app.config import Config, obtener_config
 from app.db import crear_fabrica_de_sesiones, crear_motor, esquema_creado
 from app.logs import configurar_logs
+from app.nucleo.atenciones import AtencionFirmada
 from app.nucleo.ingesta import enviar_respuestas, ingerir
 from app.nucleo.procesamiento import Contexto
 from app.nucleo.worker import Worker
 from app.proveedores.llm import crear_proveedor_llm
 from app.proveedores.stt import crear_proveedor_stt
-from app.web import autenticacion, borradores, vinculos
+from app.web import (
+    adjuntos,
+    asignaciones,
+    atenciones,
+    autenticacion,
+    borradores,
+    digitalizacion,
+    fichas,
+    firma,
+    profesionales,
+    residentes,
+    revision,
+    tratamientos,
+    vinculos,
+)
 from app.web.autenticacion import SesionRequerida
+from app.web.limites import LimiteDeSubida
 from app.web.plantillas import pagina
 
 logger = logging.getLogger(__name__)
@@ -62,6 +78,7 @@ def crear_app(config: Config | None = None) -> FastAPI:
         aplicacion.state.usuario_bot = None
         aplicacion.state.webhook_telegram = None
         aplicacion.state.worker = None
+        aplicacion.state.worker_documentos = None
         aplicacion.state.webhook_whatsapp = None
 
         polling = worker = None
@@ -82,18 +99,18 @@ def crear_app(config: Config | None = None) -> FastAPI:
                 cliente, secreto_webhook=secreto.get_secret_value() if secreto else None
             )
             adaptadores["telegram"] = adaptador
-        if adaptadores:
-            contexto = Contexto(
-                adaptadores=adaptadores,
-                stt=crear_proveedor_stt(config),
-                llm=crear_proveedor_llm(config),
-                carpeta_audios=config.audio_dir,
-                url_publica=config.public_base_url,
-                borrar_mensajes_importados=config.telegram_delete_incoming,
-            )
-            worker = Worker(fabrica_de_sesiones, contexto)
-            aplicacion.state.worker = worker
-            worker.iniciar()
+        contexto = Contexto(
+            adaptadores=adaptadores,
+            stt=crear_proveedor_stt(config),
+            llm=crear_proveedor_llm(config),
+            carpeta_audios=config.audio_dir,
+            url_publica=config.public_base_url,
+            borrar_mensajes_importados=config.telegram_delete_incoming,
+        )
+        worker = Worker(fabrica_de_sesiones, contexto)
+        aplicacion.state.worker = worker
+        aplicacion.state.worker_documentos = worker
+        worker.iniciar()
 
         if config.telegram_mode != "off":
             if config.telegram_mode == "polling":
@@ -131,6 +148,8 @@ def crear_app(config: Config | None = None) -> FastAPI:
     )
     # Las rutas web leen de aquí la configuración, como los días sin actividad de un borrador.
     app.state.config = config
+    # Rechaza con 413 una petición enorme antes de leerla entera (ver app/web/limites.py).
+    app.add_middleware(LimiteDeSubida)
     app.add_middleware(
         SessionMiddleware,
         secret_key=_clave_de_sesion(config),
@@ -139,8 +158,18 @@ def crear_app(config: Config | None = None) -> FastAPI:
         https_only=en_servidor,  # con HTTPS, la cookie de sesión solo viaja cifrada
     )
     app.include_router(autenticacion.router)
+    app.include_router(asignaciones.router)
     app.include_router(vinculos.router)
     app.include_router(borradores.router)
+    app.include_router(residentes.router)
+    app.include_router(profesionales.router)
+    app.include_router(fichas.router)
+    app.include_router(atenciones.router)
+    app.include_router(revision.router)
+    app.include_router(firma.router)
+    app.include_router(tratamientos.router)
+    app.include_router(adjuntos.router)
+    app.include_router(digitalizacion.router)
     app.include_router(webhook_telegram.router)
     app.include_router(webhook_whatsapp.router)
 
@@ -148,6 +177,19 @@ def crear_app(config: Config | None = None) -> FastAPI:
     async def ir_al_inicio_de_sesion(request: Request, error: SesionRequerida):
         return RedirectResponse(
             f"/login?siguiente={quote(error.siguiente)}", status_code=303
+        )
+
+    @app.exception_handler(AtencionFirmada)
+    async def atencion_firmada(request: Request, error: AtencionFirmada):
+        # Una atención firmada no se modifica (Ley 20.584, art. 12): cualquier ruta que lo
+        # intente responde 409, aunque no capture el error.
+        return pagina(
+            request,
+            "error.html",
+            status_code=409,
+            codigo=409,
+            titulo="Atención firmada",
+            mensaje=str(error),
         )
 
     @app.exception_handler(StarletteHTTPException)
