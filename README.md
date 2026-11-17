@@ -103,6 +103,7 @@ Render, `render.yaml` fija las que no son secretas, y los secretos se ingresan e
 | `DIAS_SIN_ACTIVIDAD_BORRADOR` | Días sin cambios tras los que un borrador pendiente aparece "sin actividad" | `30` | El valor por defecto |
 | `DATABASE_URL` | Base de datos | `sqlite:///./data/app.db` | La de PostgreSQL de Render |
 | `SEED_PASSWORD` | Contraseña de los usuarios de demostración. **Secreto** | — | Se ingresa en el panel |
+| `SEED_DEMO` | Carga además la ficha de la demo de la entrega 2: asignaciones, antecedentes, mediciones y atenciones firmadas | `false` | `true` para la demo |
 | `STT_PROVIDER` y `STT_MODEL` | Transcripción de audios: `fake` u `openai`, y el modelo | `fake` y `gpt-transcribe` | `openai` |
 | `AUDIO_DIR` | Carpeta donde está cada audio mientras se transcribe | La carpeta temporal del sistema | El valor por defecto |
 | `LLM_PROVIDER` y `LLM_MODEL` | Extracción con IA: `fake` u `openai`, y el modelo | `fake` y `gpt-6-luna` | `openai` |

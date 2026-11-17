@@ -63,6 +63,8 @@ class Config(BaseSettings):
     database_url: str = "sqlite:///./data/app.db"
     # Contraseña de los usuarios de demostración que crea scripts/sembrar_datos.py.
     seed_password: SecretStr | None = None
+    # true: scripts/sembrar_datos.py carga además la ficha de la demo de la entrega 2.
+    seed_demo: bool = False
 
     # Transcripción de audios. fake: devuelve un texto fijo (tests y pruebas sin API key).
     stt_provider: Literal["fake", "openai"] = "fake"
