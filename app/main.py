@@ -45,6 +45,7 @@ from app.web import (
     vinculos,
 )
 from app.web.autenticacion import SesionRequerida
+from app.web.limites import LimiteDeSubida
 from app.web.plantillas import pagina
 
 logger = logging.getLogger(__name__)
@@ -146,6 +147,8 @@ def crear_app(config: Config | None = None) -> FastAPI:
     )
     # Las rutas web leen de aquí la configuración, como los días sin actividad de un borrador.
     app.state.config = config
+    # Rechaza con 413 una petición enorme antes de leerla entera (ver app/web/limites.py).
+    app.add_middleware(LimiteDeSubida)
     app.add_middleware(
         SessionMiddleware,
         secret_key=_clave_de_sesion(config),
