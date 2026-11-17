@@ -1,8 +1,8 @@
 """Interfaz de los proveedores de LLM.
 
-Un proveedor solo sabe pedirle al modelo un JSON que cumpla un esquema. Qué se le pide, con qué
-instrucciones, y cómo se valida la respuesta lo decide el núcleo (app/nucleo/extraccion.py), así
-que se cambia un proveedor por otro con LLM_PROVIDER sin tocar el resto del código.
+Un proveedor pide al modelo un JSON estructurado o la lectura literal de una imagen. La
+extracción y validación de campos la decide el núcleo (app/nucleo/extraccion.py), así que se
+cambia un proveedor por otro con LLM_PROVIDER sin tocar el resto del código.
 """
 
 from abc import ABC, abstractmethod
@@ -16,7 +16,7 @@ class ErrorLLM(Exception):
 
 @dataclass(frozen=True)
 class ResultadoLLM:
-    texto: str  # el JSON que devolvió el modelo, como texto
+    texto: str  # JSON de la extracción, o texto literal de la imagen
     modelo: str
 
 
@@ -28,3 +28,11 @@ class ProveedorLLM(ABC):
         self, instrucciones: str, entrada: str, esquema: dict[str, Any]
     ) -> ResultadoLLM:
         """Pide al modelo un JSON que cumpla el esquema (JSON Schema)."""
+
+    @abstractmethod
+    def leer_imagen(self, contenido: bytes, mime: str) -> ResultadoLLM:
+        """Lee una imagen JPG/PNG validada, sin interpretar ni completar datos.
+
+        Devuelve el texto literal, con [ilegible] donde no puede leer, y el modelo usado.
+        La imagen no está seudonimizada: en la demo solo se envían documentos ficticios.
+        """

@@ -42,3 +42,34 @@ no entrega datos clínicos.
 Ejecutar `ruff check .` y `pytest`. El workflow de GitHub verifica Python 3.11, Python 3.13 y
 las migraciones en PostgreSQL. Antes de integrar un PR dependiente, actualizarlo con `Develop`
 y resolver los conflictos conservando las rutas y enlaces de ambas tareas.
+
+## Prueba de lectura de manuscritos (E4-01)
+
+El script no usa la base de datos ni activa los bots. Configurar `LLM_PROVIDER=openai`,
+`LLM_MODEL=gpt-6-luna` y `OPENAI_API_KEY` en el `.env` local, sin publicar la clave:
+
+```bash
+python -m scripts.probar_lectura_imagen --datos-ficticios /ruta/documento.jpg
+```
+
+Admite una imagen JPG o PNG de hasta 10 MB, validada por sus bytes. Devuelve la transcripción
+literal, las marcas `[ilegible]`, el modelo solicitado, el modelo usado y el tiempo de respuesta.
+No interpreta el documento ni resuelve fechas relativas. Rechazos, respuestas truncadas o
+vacías y errores de red/API terminan con código de error; no cuentan como prueba aprobada.
+
+Contrato implementado en OpenAI y fake:
+
+```python
+leer_imagen(contenido: bytes, mime: str) -> ResultadoLLM
+# ResultadoLLM.texto: transcripción literal; ResultadoLLM.modelo: modelo usado.
+```
+
+El flujo propuesto es imagen → texto literal → seudonimización → extractor existente. El texto
+literal y su modelo se guardarán antes de extraer, para poder reintentar sin releer la imagen.
+La imagen no se puede seudonimizar antes de enviarla: solo se prueban documentos ficticios.
+El proveedor fake sirve para tests, no demuestra capacidad del modelo del curso.
+
+**Validación real pendiente:** probar 2 o 3 manuscritos ficticios del equipo y registrar en #17
+los tiempos, errores de lectura y una salida de ejemplo. No dar por confirmado el soporte de
+imágenes hasta completar esa prueba. Si la API no las acepta, avisar en #17 y acordar el plan B
+(OCR local para impresos y transcripción asistida para manuscritos) antes de integrar E4-03.
