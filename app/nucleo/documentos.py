@@ -42,8 +42,8 @@ def subir_documento(
     tipo_documento = tipo_documento.strip()
     if not tipo_documento or len(tipo_documento) > 120:
         raise ValueError("Indica el tipo de documento (hasta 120 caracteres).")
-    if detectar_mime(contenido) not in ("image/jpeg", "image/png"):
-        raise ArchivoNoPermitido("La digitalización admite imágenes JPG o PNG.")
+    if detectar_mime(contenido) not in ("image/jpeg", "image/png", "application/pdf"):
+        raise ArchivoNoPermitido("La digitalización admite archivos PDF, JPG o PNG.")
     adjunto = guardar_adjunto(
         sesion,
         residente_id,

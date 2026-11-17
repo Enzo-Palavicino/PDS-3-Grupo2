@@ -1,0 +1,31 @@
+.dig-etapas { display: flex; gap: 1rem; list-style: none; padding: 0; margin: 2rem 0; }
+.dig-etapas li { flex: 1; display: flex; gap: .5rem; align-items: center; color: var(--color-text-secondary); font-size: .875rem; border-bottom: 2px solid var(--color-border); padding-bottom: 1rem; }
+.dig-etapas li[aria-current="step"] { color: var(--color-primary); border-color: var(--color-primary); font-weight: 600; }
+.dig-etapas small { display: block; font-weight: normal; }
+.dig-numero { display: grid; place-items: center; min-width: 2rem; height: 2rem; border-radius: 50%; background: var(--color-surface-sunken); }
+[aria-current="step"] .dig-numero { background: var(--color-primary); color: var(--color-on-primary); }
+.dig-js { display: none; }
+.dig-activo .dig-js { display: flex; }
+.dig-activo [hidden] { display: none !important; }
+.dig-carga { grid-column: 1 / -1; border: 2px dashed var(--color-border-strong); border-radius: var(--radius-lg); padding: 1.5rem; }
+.dig-carga[data-arrastrando] { background: var(--color-secondary); }
+.dig-archivos { padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: .75rem; }
+.dig-archivos li { padding: .75rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); display: flex; gap: .75rem; align-items: center; justify-content: space-between; overflow-wrap: anywhere; }
+@media (max-width: 700px) { .dig-etapas { flex-wrap: wrap; } .dig-etapas li { flex: 1 1 40%; } }
+
+
+/* Espaciado y alineación locales, conservando los tokens de la aplicación. */
+.dig-formulario { margin-top: var(--space-6); padding-top: var(--space-6); border-top: 1px solid var(--color-border); }
+.dig-formulario h2 { margin-bottom: var(--space-5); }
+.dig-metadatos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: var(--space-6); }
+.dig-metadatos .field { min-width: 0; }
+.dig-metadatos .field__control { width: 100%; }
+.dig-carga { display: flex; flex-direction: column; align-items: center; gap: var(--space-4); padding: var(--space-8); text-align: center; }
+.dig-carga input[type="file"] { max-width: 36rem; height: auto; padding: var(--space-3); }
+.dig-carga input::file-selector-button { padding: .5rem .75rem; margin-right: .75rem; border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text); font: inherit; cursor: pointer; }
+.dig-carga .field__help { margin: 0; }
+.dig-nota { margin-top: var(--space-4); }
+.dig-formulario .res-actions { justify-content: flex-end; padding-top: var(--space-4); }
+.dig-archivos:empty, #resumen-archivos:empty { display: none; }
+[data-etapa] h2:focus:not(:focus-visible) { outline: none; }
+@media (max-width: 600px) { .dig-metadatos { grid-template-columns: 1fr; } .dig-carga { padding: var(--space-4); } }

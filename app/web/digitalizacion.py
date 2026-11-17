@@ -142,7 +142,7 @@ def subir(
                 "Selecciona al residente y confirma su identidad antes de subir documentos."
             )
         if not 1 <= len(archivos) <= MAXIMO_ARCHIVOS:
-            raise ValueError("Selecciona entre 1 y 10 imágenes por carga.")
+            raise ValueError("Selecciona entre 1 y 10 archivos por carga.")
         try:
             fecha = date.fromisoformat(fecha_original) if fecha_original else None
         except ValueError:
