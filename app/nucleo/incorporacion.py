@@ -10,12 +10,18 @@ sin que nadie los copie a mano:
 
 Los diagnósticos no se copian: quedan en el historial, que son las atenciones firmadas.
 
+Si la atención es una adenda, antes se retira lo que aportó la atención que corrige: sus
+tratamientos vigentes quedan suspendidos, sus controles pendientes anulados y sus antecedentes y
+medición se quitan (la adenda trae los suyos). Así la ficha no muestra a la vez el dato corregido
+y el original, ni duplica lo que no cambió.
+
 Se usa a través de app.nucleo.atenciones.incorporar_a_ficha, que es el contrato del esqueleto.
 """
 
 from datetime import date, datetime
 from typing import Any
 
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.db import ahora
@@ -29,8 +35,10 @@ from app.modelos import (
     OrigenAtencion,
     TipoAntecedente,
     Tratamiento,
+    UsuarioWeb,
 )
 from app.nucleo.extraccion import ZONA_HORARIA
+from app.nucleo.tratamientos import estado_vigente, suspender_tratamiento
 
 ANTECEDENTES = {
     "alergias": TipoAntecedente.ALERGIA,
@@ -49,6 +57,8 @@ def incorporar(sesion: Session, atencion: Atencion, momento: datetime | None = N
         return
     momento = momento or ahora()
     hoy = momento.astimezone(ZONA_HORARIA).date()
+    if atencion.corrige_a_id is not None:
+        _retirar_lo_corregido(sesion, atencion, momento)
     campos = atencion.campos or {}
     autor = atencion.firmada_por or atencion.verificada_por or atencion.creado_por
 
@@ -74,6 +84,37 @@ def incorporar(sesion: Session, atencion: Atencion, momento: datetime | None = N
     if medicion := _medicion(atencion, campos.get("mediciones")):
         sesion.add(medicion)
     atencion.incorporada_en = momento
+
+
+def _retirar_lo_corregido(sesion: Session, adenda: Atencion, momento: datetime) -> None:
+    """Retira de la ficha lo que aportó la atención que la adenda corrige:
+
+    - sus tratamientos vigentes quedan suspendidos, a nombre de quien firmó la adenda;
+    - sus controles pendientes quedan anulados;
+    - sus antecedentes y su medición se quitan, porque la adenda vuelve a crear los suyos (que
+      parten de una copia de la original). Si no, una corrección de dosis duplicaría la alergia y
+      corregir una alergia mal registrada dejaría la equivocada. El dato no se pierde: sigue en la
+      atención corregida, que está firmada y no cambia.
+    """
+    firmante = sesion.get(UsuarioWeb, adenda.firmada_por)
+    motivo = f"Corregido por la atención #{adenda.id}"
+    hoy = momento.astimezone(ZONA_HORARIA).date()
+    tratamientos = sesion.scalars(
+        select(Tratamiento).where(Tratamiento.atencion_id == adenda.corrige_a_id)
+    )
+    for tratamiento in tratamientos:
+        if estado_vigente(tratamiento, hoy) == EstadoTratamiento.ACTIVO:
+            suspender_tratamiento(sesion, tratamiento, firmante, motivo, momento)
+    controles = sesion.scalars(
+        select(Control).where(
+            Control.atencion_id == adenda.corrige_a_id,
+            Control.estado == EstadoControl.PENDIENTE,
+        )
+    )
+    for control in controles:
+        control.estado = EstadoControl.ANULADO
+    for modelo in (Antecedente, Medicion):
+        sesion.execute(delete(modelo).where(modelo.atencion_id == adenda.corrige_a_id))
 
 
 def _tratamiento(atencion: Atencion, indicacion: Any, hoy: date) -> Tratamiento | None:
