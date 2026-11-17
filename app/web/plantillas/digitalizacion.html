@@ -9,7 +9,7 @@
 <div id="flujo-digitalizacion" data-inicio="{{ 4 if exito else 2 if residente else 1 }}">
 <ol class="dig-etapas" aria-label="Etapas de digitalización">
 {% for nombre in ["Seleccionar residente", "Confirmar identidad", "Cargar documentos", "Seguimiento", "Revisar e incorporar"] %}
-<li data-indicador="{{ loop.index }}"><span class="dig-numero">{{ loop.index }}</span><span>{{ nombre }}{% if loop.last %}<small>Pendiente de habilitar</small>{% endif %}</span></li>
+<li data-indicador="{{ loop.index }}"><span class="dig-numero">{{ loop.index }}</span><span>{{ nombre }}</span></li>
 {% endfor %}
 </ol>
 {% if exito %}{% call alert("success", role="status") %}{{ exito }}{% endcall %}{% endif %}
@@ -49,12 +49,12 @@
 <p id="actualizacion-documentos" role="status">Los estados se actualizan automáticamente cada 5 segundos.</p>
 <noscript><p>Activa JavaScript para actualizar los estados automáticamente.</p></noscript>
 <p><a href="/digitalizacion?residente_id={{ residente.id }}" id="actualizar-documentos">Actualizar estados</a></p>
-<div class="card res-scroll"><table class="res-table"><thead><tr><th scope="col">Documento</th><th scope="col">Tipo</th><th scope="col">Fecha original</th><th scope="col">Estado</th><th scope="col">Intentos</th><th scope="col">Archivo</th></tr></thead>
+<div class="card res-scroll"><table class="res-table"><thead><tr><th scope="col">Documento</th><th scope="col">Tipo</th><th scope="col">Fecha original</th><th scope="col">Estado</th><th scope="col">Intentos</th><th scope="col">Archivo</th><th scope="col">Revisión</th></tr></thead>
 <tbody id="filas-documentos">
-{% for d in documentos %}<tr data-documento-id="{{ d.id }}"><th scope="row">{{ d.nombre }}</th><td>{{ d.tipo }}</td><td>{{ d.fecha }}</td><td>{{ d.estado }}</td><td>{{ d.intentos }}</td><td><a href="/adjuntos/{{ d.adjunto_id }}/descargar">Descargar original</a></td></tr>
-{% else %}<tr data-vacio><td colspan="6">Todavía no hay documentos históricos para este residente.</td></tr>{% endfor %}
+{% for d in documentos %}<tr data-documento-id="{{ d.id }}"><th scope="row">{{ d.nombre }}</th><td>{{ d.tipo }}</td><td>{{ d.fecha }}</td><td>{{ d.estado }}</td><td>{{ d.intentos }}</td><td><a href="/adjuntos/{{ d.adjunto_id }}/descargar">Descargar original</a></td><td><a href="/digitalizacion/{{ d.id }}">{{ "Revisar" if d.estado == "Por revisar" else "Ver documento" }}</a></td></tr>
+{% else %}<tr data-vacio><td colspan="7">Todavía no hay documentos históricos para este residente.</td></tr>{% endfor %}
 </tbody></table></div>
-<p>La información extraída debe revisarse antes de incorporarla a la ficha. La etapa de revisión e incorporación aún no está disponible en esta versión.</p>
+<p>Abre «Revisar» para comparar los datos con el original antes de incorporarlos a la ficha.</p>
 <div class="res-actions dig-js"><button class="btn btn--neutral" type="button" data-nuevo-lote data-ir="2">Cargar otro lote</button><button class="btn btn--neutral" type="button" data-ir="1">Cambiar residente</button></div>
 </section>
 <p class="dig-js" id="acceso-seguimiento"><button class="btn btn--neutral" type="button" data-ir="4">Ver documentos y seguimiento</button></p>

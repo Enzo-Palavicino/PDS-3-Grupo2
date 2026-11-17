@@ -320,4 +320,4 @@ def test_la_edad_se_muestra_en_meses_hasta_los_dos_anios(nacimiento, texto):
 def test_el_historial_cuenta_en_singular_y_plural(cliente, entrar, sesion, emilia, firmada):
     entrar("pediatra")
 
-    assert "1 firmada<" in seccion(cliente.get(f"/residentes/{emilia.id}").text, "historial")
+    assert "1 confirmada<" in seccion(cliente.get(f"/residentes/{emilia.id}").text, "historial")

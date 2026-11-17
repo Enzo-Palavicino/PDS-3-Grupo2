@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% from "ui/encabezados.html" import page_header, back_link %}
+{% from "ui/formularios.html" import csrf_field, field %}
+{% from "ui/avisos.html" import alert %}
+{% block titulo %}Revisar documento #{{ documento.id }}{% endblock %}
+{% block contenido %}
+{{ back_link("/digitalizacion?residente_id=" ~ residente.id, "Documentos históricos") }}
+{{ page_header("Revisar documento #" ~ documento.id, residente.codigo ~ " · " ~ residente.nombres ~ " " ~ residente.apellidos) }}
+<style>{% include "estilos/revision_documentos.css" %}</style>
+<p><strong>{{ estado }}</strong> · {{ documento.tipo_documento or "Sin tipo" }} · Subido el {{ documento.subido_en | hora_chile }}</p>
+{% if error %}{% call alert("danger", role="alert") %}{{ error }}{% endcall %}{% endif %}
+{% call alert("warning") %}
+La IA puede equivocarse, especialmente en fechas. Compara cada valor con el original.
+La fecha original y el residente no se deducen de la fecha de carga.
+La verificación de un registro histórico no es una firma médica nueva.
+{% endcall %}
+{% if documento.ambiguedades %}
+{% call alert("warning", title="Datos que requieren atención") %}
+<ul>{% for a in documento.ambiguedades %}<li>{{ a.campo }}: {{ a.motivo }}</li>{% endfor %}</ul>
+{% endcall %}
+{% endif %}
+{% if '[ilegible]' in (documento.texto_leido or '') | lower %}
+{% call alert("warning", title="Texto ilegible detectado") %}La lectura contiene marcas [ilegible]. Revisa esas partes en el original y en el texto literal antes de incorporar.{% endcall %}
+{% endif %}
+{% if duplicados %}
+{% call alert("warning", title="Posibles duplicados") %}
+<p>La incorporación está bloqueada: hay atenciones de este residente con la misma fecha y diagnóstico. Compara los originales; corrige únicamente errores reales de lectura o descarta el documento con un motivo.</p>
+<ul>{% for id in duplicados %}<li><a href="/residentes/{{ residente.id }}#atencion-{{ id }}" target="_blank" rel="noopener">Comparar con atención #{{ id }}</a></li>{% endfor %}</ul>
+{% endcall %}
+{% endif %}
+{% if documento.atencion_id %}
+<p><a class="btn btn--primary" href="/residentes/{{ residente.id }}#atencion-{{ documento.atencion_id }}">Ver atención digitalizada en la ficha</a></p>
+{% endif %}
+{% if verificador %}<p>Revisado por {{ verificador.usuario }} el {{ documento.revisado_en | hora_chile }}.</p>{% endif %}
+{% if documento.motivo_descarte %}<p><strong>Motivo del descarte:</strong> {{ documento.motivo_descarte }}</p>{% endif %}
+<div class="dig-revision">
+  <section class="card res-panel dig-original">
+    <h2>Original</h2>
+    <p><a href="/digitalizacion/{{ documento.id }}/original" target="_blank" rel="noopener">Ampliar imagen</a> · <a href="/adjuntos/{{ adjunto.id }}/descargar">Descargar original</a></p>
+    <img src="/digitalizacion/{{ documento.id }}/original" alt="Documento original de {{ residente.nombres }} {{ residente.apellidos }}">
+    <details><summary>Texto literal leído por la IA</summary>
+      <p>Modelo: {{ documento.modelo_lectura or "Aún no leído" }}</p>
+      <pre class="{{ 'dig-ilegible' if '[ilegible]' in (documento.texto_leido or '') | lower else '' }}">{{ documento.texto_leido or "Todavía no hay lectura disponible." }}</pre>
+    </details>
+  </section>
+  <section class="card res-panel">
+    <h2>Campos extraídos y revisión</h2>
+    {% if puede_editar %}
+    <form method="post" action="/digitalizacion/{{ documento.id }}/incorporar" id="revision-documento">
+      {{ csrf_field(csrf) }}
+      {{ field("profesional_texto", "Profesional del documento", required=True, value=valores.get("profesional_texto", ""), help="Transcribe el nombre del original. Si no aparece, escribe «No consta en el original».") }}
+      <p>El residente seleccionado no cambia en esta revisión. Si el documento pertenece a otro, descártalo y vuelve a cargarlo con la identidad correcta.</p>
+      {% for seccion in secciones %}
+      <fieldset class="dig-grupo">
+        <legend>{{ seccion.etiqueta }}</legend>
+        <div class="dig-filas">
+        {% for fila in seccion.filas %}
+        <div class="dig-fila">
+          <div class="dig-campos">
+          {% for nombre, etiqueta, tipo in seccion.columnas %}
+          <label class="field"><span class="field__label">{{ etiqueta }}</span>
+            {% if tipo == "textarea" %}
+            <textarea class="field__control" name="{{ seccion.clave }}.{{ nombre }}" rows="2">{{ fila.valores[nombre] }}</textarea>
+            {% else %}
+            <input class="field__control" type="{{ tipo }}" name="{{ seccion.clave }}.{{ nombre }}" value="{{ fila.valores[nombre] }}"{% if tipo == "number" %} step="any" min="0"{% endif %}>
+            {% endif %}
+          </label>
+          {% endfor %}
+          </div>
+          <blockquote class="dig-evidencia{{ ' dig-ilegible' if '[ilegible]' in (fila.fragmento or '') | lower else '' }}">{{ fila.fragmento or "Sin fragmento de la IA; confirma este dato contra el original." }}</blockquote>
+          {% if seccion.lista %}<button type="button" class="btn btn--neutral dig-quitar" hidden>Quitar dato</button>{% endif %}
+        </div>
+        {% endfor %}
+        </div>
+        {% if seccion.lista %}<button type="button" class="btn btn--neutral dig-agregar" hidden>Añadir dato</button>{% endif %}
+      </fieldset>
+      {% endfor %}
+      <p><label><input type="checkbox" name="verificado" value="true" required{% if valores.get("verificado") == "true" %} checked{% endif %}> Verificado contra el original: revisé los campos y las advertencias.</label></p>
+      <button class="btn btn--primary">Verificado contra el original · Incorporar a la ficha</button>
+    </form>
+    {% else %}
+      <p>Este documento no está disponible para edición. Si está procesando, vuelve a abrirlo cuando figure por revisar.</p>
+    {% endif %}
+    {% if puede_descartar %}
+    <details class="dig-descarte">
+      <summary>Descartar documento</summary>
+      <form method="post" action="/digitalizacion/{{ documento.id }}/descartar">
+        {{ csrf_field(csrf) }}
+        {{ field("motivo", "Motivo del descarte", required=True, value=valores.get("motivo", "")) }}
+        <p>Se conserva el original y queda constancia del descarte; no se incorpora a la ficha.</p>
+        <button class="btn btn--neutral">Descartar documento</button>
+      </form>
+    </details>
+    {% endif %}
+  </section>
+</div>
+<script>{% include "scripts/revision_documentos.js" %}</script>
+{% endblock %}

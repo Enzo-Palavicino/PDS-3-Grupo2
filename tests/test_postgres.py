@@ -6,6 +6,9 @@ el índice único parcial de los vínculos y el largo máximo de los textos (SQL
 """
 
 import os
+from concurrent.futures import ThreadPoolExecutor
+from datetime import date
+from threading import Barrier
 
 import pytest
 from alembic import command
@@ -14,15 +17,27 @@ from sqlalchemy.exc import DBAPIError, IntegrityError
 
 from app.db import crear_fabrica_de_sesiones, crear_motor
 from app.modelos import (
+    Atencion,
     BorradorAtencion,
+    EstadoDocumento,
     EventoAuditoria,
     MensajeEntrante,
     Profesional,
     TipoActor,
+    UsuarioWeb,
     VinculoCanal,
 )
+from app.nucleo.documentos import subir_documento
 from app.nucleo.mensajes import registrar_mensaje_entrante
+from app.nucleo.revision_documentos import (
+    DocumentoDuplicado,
+    DocumentoNoRevisable,
+    verificar_documento,
+)
+from scripts.sembrar_datos import sembrar
+from tests.nucleo.test_digitalizacion import CAMPOS
 from tests.test_migraciones import insertar_datos_previos_a_la_0004
+from tests.web.test_web_adjuntos import PNG
 
 URL = os.environ.get("TEST_POSTGRES_URL")
 
@@ -51,6 +66,44 @@ def profesional_postgres(fabrica_postgres) -> int:
 
 def test_los_modelos_coinciden_con_las_migraciones(fabrica_postgres, configurar_alembic):
     command.check(configurar_alembic(URL))
+
+
+@pytest.mark.parametrize("mismo_documento", [True, False])
+def test_verificacion_concurrente_no_duplica_historicos(fabrica_postgres, mismo_documento):
+    with fabrica_postgres.begin() as sesion:
+        sembrar(sesion, "clave-de-prueba")
+        usuario = sesion.scalar(select(UsuarioWeb).where(UsuarioWeb.usuario == "encargada_salud"))
+        ids = []
+        for _ in range(2):
+            documento = subir_documento(
+                sesion, 2, PNG, "original.png", "Registro", usuario, date(2026, 8, 12)
+            )
+            documento.estado = EstadoDocumento.POR_REVISAR
+            documento.campos = CAMPOS
+            ids.append(documento.id)
+    if mismo_documento:
+        ids[1] = ids[0]
+    inicio = Barrier(2)
+
+    def intentar(documento_id):
+        inicio.wait(timeout=10)
+        try:
+            with fabrica_postgres.begin() as sesion:
+                verificar_documento(
+                    sesion, documento_id, usuario, CAMPOS, "Dra. Ficticia", True
+                )
+            return "incorporado"
+        except (DocumentoDuplicado, DocumentoNoRevisable):
+            return "rechazado"
+
+    with ThreadPoolExecutor(max_workers=2) as hilos:
+        resultados = list(hilos.map(intentar, ids))
+    assert sorted(resultados) == ["incorporado", "rechazado"]
+    with fabrica_postgres() as sesion:
+        assert sesion.scalar(select(func.count()).select_from(Atencion)) == 1
+        assert sesion.scalar(select(func.count()).select_from(EventoAuditoria).where(
+            EventoAuditoria.accion == "documento_incorporado"
+        )) == 1
 
 
 @pytest.mark.parametrize(

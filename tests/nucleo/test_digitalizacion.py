@@ -12,15 +12,11 @@ from app.modelos import (
     EstadoDocumento,
     EventoAuditoria,
     TipoActor,
-    UsuarioWeb,
 )
 from app.nucleo.digitalizacion import posibles_duplicados, procesar_documento
-from app.nucleo.documentos import subir_documento
 from app.nucleo.extraccion import ErrorExtraccion
 from app.nucleo.worker import Worker
 from app.proveedores.llm.fake import ProveedorLLMFake
-from scripts.sembrar_datos import sembrar
-from tests.web.test_web_adjuntos import PNG
 
 TEXTO = (
     "Emilia Soto. Fecha 12/08/2026. Diagnóstico control sano. "
@@ -35,19 +31,6 @@ CAMPOS = {
         "fragmento": "Próximo control en dos semanas",
     },
 }
-
-
-@pytest.fixture
-def crear_documento(sesion):
-    sembrar(sesion, "clave-de-prueba")
-    usuario = sesion.scalar(select(UsuarioWeb).where(UsuarioWeb.usuario == "encargada_salud"))
-    sesion.commit()
-
-    def crear(fecha=date(2026, 8, 12), contenido=PNG):
-        documento = subir_documento(sesion, 2, contenido, "original", "Registro", usuario, fecha)
-        sesion.commit()
-        return documento
-    return crear
 
 
 def lector(texto=TEXTO, campos=None):

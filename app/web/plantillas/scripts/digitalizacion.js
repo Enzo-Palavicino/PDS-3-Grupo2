@@ -20,7 +20,7 @@
       if (!fila) {
         fila = document.createElement('tr');
         fila.dataset.documentoId = String(Number(d.id));
-        for (let i = 0; i < 6; i++) {
+        for (let i = 0; i < 7; i++) {
           const celda = document.createElement(i === 0 ? 'th' : 'td');
           if (i === 0) celda.scope = 'row';
           fila.appendChild(celda);
@@ -28,6 +28,7 @@
         const descargar = document.createElement('a');
         descargar.textContent = 'Descargar original';
         fila.children[5].appendChild(descargar);
+        fila.children[6].appendChild(document.createElement('a'));
         tbody.prepend(fila);
       }
       [d.nombre, d.tipo, d.fecha, d.estado, d.intentos].forEach((valor, i) => {
@@ -35,12 +36,15 @@
         if (fila.children[i].textContent !== texto) fila.children[i].textContent = texto;
       });
       fila.children[5].querySelector('a').href = `/adjuntos/${Number(d.adjunto_id)}/descargar`;
+      const revisar = fila.children[6].querySelector('a');
+      revisar.href = `/digitalizacion/${Number(d.id)}`;
+      revisar.textContent = d.estado === 'Por revisar' ? 'Revisar' : 'Ver documento';
     });
     if (!documentos.length && !tbody.querySelector('[data-vacio]')) {
       const fila = document.createElement('tr');
       fila.dataset.vacio = '';
       const celda = document.createElement('td');
-      celda.colSpan = 6;
+      celda.colSpan = 7;
       celda.textContent = 'Todavía no hay documentos históricos para este residente.';
       fila.appendChild(celda);
       tbody.appendChild(fila);

@@ -39,6 +39,7 @@ class Accion(StrEnum):
     ADJUNTO_SUBIDO = "adjunto_subido"
     ADJUNTO_DESCARGADO = "adjunto_descargado"
     DOCUMENTO_SUBIDO = "documento_subido"
+    DOCUMENTO_LEIDO = "documento_leido"
     DOCUMENTO_INCORPORADO = "documento_incorporado"
     DOCUMENTO_DESCARTADO = "documento_descartado"
     TRATAMIENTO_SUSPENDIDO = "tratamiento_suspendido"
