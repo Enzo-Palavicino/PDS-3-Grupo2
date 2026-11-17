@@ -1,4 +1,5 @@
-"""Firma de atenciones (E3-03): el timbre del profesional y la pantalla de firma."""
+"""Firma de atenciones (E3-03): el timbre del profesional y la pantalla de firma. También la
+corrección de una atención firmada con una adenda (E3-06)."""
 
 from typing import Annotated
 
@@ -14,6 +15,7 @@ from app.modelos import (
     Rol,
     UsuarioWeb,
 )
+from app.nucleo.adendas import CorreccionEnCurso, adenda_en_curso, crear_adenda
 from app.nucleo.atenciones import AtencionFirmada, ErrorDeAtencion, firmar_atencion
 from app.nucleo.permisos import puede_firmar
 from app.nucleo.timbres import (
@@ -141,3 +143,55 @@ def _pagina_de_firma(
         nombres={residente.codigo: f"{residente.nombres} {residente.apellidos}"},
         error=error,
     )
+
+
+@router.get("/atenciones/{atencion_id:int}/corregir")
+def pantalla_de_correccion(
+    request: Request, atencion_id: int, sesion: SesionBD, usuario: UsuarioProfesional
+):
+    original = _atencion_por_corregir(sesion, atencion_id, usuario)
+    en_curso = adenda_en_curso(sesion, original)
+    if en_curso is not None:
+        return RedirectResponse(f"/atenciones/{en_curso.id}", status_code=303)
+    return pagina(request, "corregir.html", usuario=usuario, atencion=original)
+
+
+@router.post("/atenciones/{atencion_id:int}/corregir", dependencies=[Depends(verificar_csrf)])
+def corregir(
+    request: Request,
+    atencion_id: int,
+    sesion: SesionBD,
+    usuario: UsuarioProfesional,
+    motivo: Annotated[str, Form()] = "",
+):
+    original = _atencion_por_corregir(sesion, atencion_id, usuario)
+    try:
+        adenda = crear_adenda(sesion, original, usuario, motivo)
+    except CorreccionEnCurso as error:
+        return RedirectResponse(f"/atenciones/{error.adenda.id}", status_code=303)
+    except ErrorDeAtencion as error:
+        return pagina(
+            request,
+            "corregir.html",
+            status_code=400,
+            usuario=usuario,
+            atencion=original,
+            error=str(error),
+        )
+    sesion.commit()
+    # La adenda se edita y se firma como cualquier atención (pantalla de E3-02).
+    return RedirectResponse(f"/atenciones/{adenda.id}", status_code=303)
+
+
+def _atencion_por_corregir(sesion: Session, atencion_id: int, usuario: UsuarioWeb) -> Atencion:
+    original = sesion.get(Atencion, atencion_id)
+    if original is None:
+        raise HTTPException(404, "La atención no existe.")
+    if original.estado != EstadoAtencion.FIRMADA:
+        raise HTTPException(409, "Solo se corrige una atención firmada; una en borrador se edita.")
+    es_autor = (
+        usuario.profesional_id is not None and usuario.profesional_id == original.profesional_id
+    )
+    if not es_autor:
+        raise HTTPException(403, "Solo el profesional que hizo la atención puede corregirla.")
+    return original
