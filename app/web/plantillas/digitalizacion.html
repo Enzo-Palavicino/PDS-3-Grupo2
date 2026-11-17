@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% from "ui/formularios.html" import csrf_field, field %}
+{% from "ui/encabezados.html" import page_header %}
+{% from "ui/avisos.html" import alert %}
+{% block titulo %}Digitalización{% endblock %}
+{% block contenido %}
+{{ page_header("Digitalización de registros históricos", "Selecciona al residente antes de subir fotografías de sus documentos antiguos.") }}
+{% if exito %}{% call alert("success", role="status") %}{{ exito }}{% endcall %}{% endif %}
+{% if error %}{% call alert("danger", role="alert") %}{{ error }} No se guardó ningún archivo de esta carga. Vuelve a seleccionar las imágenes.{% endcall %}{% endif %}
+<form class="card res-panel" method="get" action="/digitalizacion">
+<label class="field__label" for="residente-digitalizacion">Residente</label>
+<select class="field__control" name="residente_id" id="residente-digitalizacion" required>
+<option value="" disabled{% if not residente %} selected{% endif %}>Selecciona un residente</option>
+{% for r in residentes %}<option value="{{ r.id }}"{% if residente and r.id == residente.id %} selected{% endif %}>{{ r.codigo }} · {{ r.nombres }} {{ r.apellidos }}</option>{% endfor %}
+</select><div class="res-actions"><button class="btn btn--primary"{% if not residentes %} disabled{% endif %}>Seleccionar residente</button></div>
+{% if not residentes %}<p>Primero registra un residente en la sección Residentes.</p>{% endif %}
+</form>
+{% if residente %}
+<section class="card res-panel" aria-labelledby="identidad-documentos"><h2 id="identidad-documentos">{{ residente.codigo }} · {{ residente.nombres }} {{ residente.apellidos }}</h2>
+<p>Fecha de nacimiento: {{ residente.fecha_nacimiento }} · Estado: {{ residente.estado }}{% if residente.apodo %} · Apodo: {{ residente.apodo }}{% endif %}</p>
+<form method="post" action="/digitalizacion" enctype="multipart/form-data" data-enviando="Subiendo…">
+{{ csrf_field(csrf) }}<input type="hidden" name="residente_id" value="{{ residente.id }}">
+<p><label><input type="checkbox" name="confirmar_identidad" value="true" required> Confirmo que los documentos corresponden a {{ residente.nombres }} {{ residente.apellidos }} ({{ residente.codigo }}).</label></p>
+<div class="res-grid">
+{{ field("tipo_documento", "Tipo de documento", required=True, value=valores.get("tipo_documento", ""), help="Por ejemplo: registro de atención, receta o examen.") }}
+{{ field("fecha_original", "Fecha original (opcional)", type="date", value=valores.get("fecha_original", ""), help="Déjala vacía si no se conoce.") }}
+<div class="field"><label class="field__label" for="imagenes-historicas">Fotografías JPG o PNG</label><input class="field__control" id="imagenes-historicas" type="file" name="archivos" accept=".jpg,.jpeg,.png,image/jpeg,image/png" multiple required aria-describedby="limites-imagenes"><p class="field__help" id="limites-imagenes">Hasta 10 imágenes, 10 MB por imagen y 50 MB en total.</p></div>
+</div>
+<p>El tipo y la fecha se aplican a todas las imágenes de esta carga. Si son diferentes, súbelas en cargas separadas.</p>
+<div class="res-actions"><button class="btn btn--primary">Subir documentos</button></div>
+</form></section>
+<section aria-labelledby="documentos-historicos" data-documentos-residente="{{ residente.id }}">
+<h2 id="documentos-historicos">Documentos históricos del residente</h2>
+<p id="actualizacion-documentos" role="status">Los estados se actualizan automáticamente cada 5 segundos.</p>
+<noscript><p>Activa JavaScript para actualizar los estados automáticamente.</p></noscript>
+<p><a href="/digitalizacion?residente_id={{ residente.id }}" id="actualizar-documentos">Actualizar estados</a></p>
+<div class="card res-scroll"><table class="res-table"><thead><tr><th scope="col">Documento</th><th scope="col">Tipo</th><th scope="col">Fecha original</th><th scope="col">Estado</th><th scope="col">Intentos</th><th scope="col">Archivo</th></tr></thead>
+<tbody id="filas-documentos">
+{% for d in documentos %}<tr data-documento-id="{{ d.id }}"><th scope="row">{{ d.nombre }}</th><td>{{ d.tipo }}</td><td>{{ d.fecha }}</td><td>{{ d.estado }}</td><td>{{ d.intentos }}</td><td><a href="/adjuntos/{{ d.adjunto_id }}/descargar">Descargar original</a></td></tr>
+{% else %}<tr data-vacio><td colspan="6">Todavía no hay documentos históricos para este residente.</td></tr>{% endfor %}
+</tbody></table></div>
+<p>La información extraída debe revisarse antes de incorporarla a la ficha.</p>
+</section>
+<script>{% include "scripts/digitalizacion.js" %}</script>
+{% endif %}
+{% endblock %}
