@@ -72,7 +72,7 @@ def test_identidad_y_csrf(cliente, entrar, sesion):
     assert cliente.get('/digitalizacion?residente_id=999').status_code == 404
 
 
-@pytest.mark.parametrize('contenido', [PDF, b'no es imagen', b'', b'x' * (10 * 1024 * 1024 + 1)])
+@pytest.mark.parametrize('contenido', [b'GIF89a no permitido', b'no es imagen', b'', b'x' * (10 * 1024 * 1024 + 1)])
 def test_lote_invalido_se_revierte_completo(cliente, entrar, sesion, contenido):
     entrar('encargada_salud')
     respuesta = subir(cliente, [('archivos', ('correcta.png', PNG)), ('archivos', ('falsa.png', contenido))])
@@ -126,3 +126,16 @@ def test_servicio_no_autoriza_directora(sesion, datos_demo):
     directora = sesion.scalar(select(UsuarioWeb).where(UsuarioWeb.usuario == 'directora'))
     with pytest.raises(PermissionError):
         subir_documento(sesion, 2, PNG, 'foto.png', 'Registro', directora)
+
+
+def test_lote_pdf_e_imagen_se_guarda_para_procesamiento(cliente, entrar, sesion):
+    entrar('encargada_salud')
+    respuesta = subir(cliente, [
+        ('archivos', ('informe.pdf', PDF, 'application/pdf')),
+        ('archivos', ('foto.png', PNG, 'image/png')),
+    ])
+    assert respuesta.status_code == 200
+    documentos = list(sesion.scalars(select(DocumentoHistorico)))
+    assert len(documentos) == 2
+    assert all(d.estado == 'subido' for d in documentos)
+    assert {sesion.get(Adjunto, d.adjunto_id).contenido for d in documentos} == {PDF, PNG}
