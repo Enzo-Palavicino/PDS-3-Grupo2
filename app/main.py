@@ -76,6 +76,7 @@ def crear_app(config: Config | None = None) -> FastAPI:
         aplicacion.state.usuario_bot = None
         aplicacion.state.webhook_telegram = None
         aplicacion.state.worker = None
+        aplicacion.state.worker_documentos = None
         aplicacion.state.webhook_whatsapp = None
 
         polling = worker = None
@@ -96,18 +97,18 @@ def crear_app(config: Config | None = None) -> FastAPI:
                 cliente, secreto_webhook=secreto.get_secret_value() if secreto else None
             )
             adaptadores["telegram"] = adaptador
-        if adaptadores:
-            contexto = Contexto(
-                adaptadores=adaptadores,
-                stt=crear_proveedor_stt(config),
-                llm=crear_proveedor_llm(config),
-                carpeta_audios=config.audio_dir,
-                url_publica=config.public_base_url,
-                borrar_mensajes_importados=config.telegram_delete_incoming,
-            )
-            worker = Worker(fabrica_de_sesiones, contexto)
-            aplicacion.state.worker = worker
-            worker.iniciar()
+        contexto = Contexto(
+            adaptadores=adaptadores,
+            stt=crear_proveedor_stt(config),
+            llm=crear_proveedor_llm(config),
+            carpeta_audios=config.audio_dir,
+            url_publica=config.public_base_url,
+            borrar_mensajes_importados=config.telegram_delete_incoming,
+        )
+        worker = Worker(fabrica_de_sesiones, contexto)
+        aplicacion.state.worker = worker
+        aplicacion.state.worker_documentos = worker
+        worker.iniciar()
 
         if config.telegram_mode != "off":
             if config.telegram_mode == "polling":

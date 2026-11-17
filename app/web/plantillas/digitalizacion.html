@@ -37,7 +37,7 @@
 <div class="dig-metadatos">
 {{ field("tipo_documento", "Tipo de documento", required=True, value=valores.get("tipo_documento", ""), help="Por ejemplo: registro de atención, receta o examen.") }}
 {{ field("fecha_original", "Fecha original (opcional)", type="date", value=valores.get("fecha_original", ""), help="Déjala vacía si no se conoce.") }}
-<div class="field dig-carga" id="zona-imagenes"><label class="field__label" for="imagenes-historicas">Selecciona o arrastra tus documentos aquí</label><input class="field__control" id="imagenes-historicas" type="file" name="archivos" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" multiple required aria-describedby="limites-imagenes"><p class="field__help" id="limites-imagenes">PDF, JPG o PNG · Hasta 10 archivos · 10 MB por archivo · 50 MB por lote.</p></div>
+<div class="field dig-carga" id="zona-imagenes"><label class="field__label" for="imagenes-historicas">Selecciona o arrastra tus documentos aquí</label><input class="field__control" id="imagenes-historicas" type="file" name="archivos" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" multiple required aria-describedby="limites-imagenes"><p class="field__help" id="limites-imagenes">JPG, PNG o PDF de una página · Hasta 10 archivos · 10 MB por archivo · 50 MB por lote.</p></div>
 </div>
 <ul id="archivos-seleccionados" class="dig-archivos"></ul><p id="resumen-archivos" role="status"></p>
 <p class="field__help dig-nota">El tipo y la fecha se aplican a todo el lote. Si son diferentes, realiza cargas separadas.</p>

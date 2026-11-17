@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 from app.modelos import Adjunto, DocumentoHistorico, EventoAuditoria, UsuarioWeb
 from app.nucleo.documentos import subir_documento
 from tests.web.conftest import csrf_de
-from tests.web.test_web_adjuntos import PDF, PNG
+from tests.web.test_web_adjuntos import PNG
 
 
 def subir(cliente, archivos=None, **datos):
@@ -128,14 +128,27 @@ def test_servicio_no_autoriza_directora(sesion, datos_demo):
         subir_documento(sesion, 2, PNG, 'foto.png', 'Registro', directora)
 
 
-def test_lote_pdf_e_imagen_se_guarda_para_procesamiento(cliente, entrar, sesion):
+def test_lote_pdf_e_imagen_se_guarda_para_procesamiento(cliente, entrar, sesion, crear_pdf):
+    pdf = crear_pdf()
     entrar('encargada_salud')
     respuesta = subir(cliente, [
-        ('archivos', ('informe.pdf', PDF, 'application/pdf')),
+        ('archivos', ('informe.pdf', pdf, 'application/pdf')),
         ('archivos', ('foto.png', PNG, 'image/png')),
     ])
     assert respuesta.status_code == 200
     documentos = list(sesion.scalars(select(DocumentoHistorico)))
     assert len(documentos) == 2
     assert all(d.estado == 'subido' for d in documentos)
-    assert {sesion.get(Adjunto, d.adjunto_id).contenido for d in documentos} == {PDF, PNG}
+    assert {sesion.get(Adjunto, d.adjunto_id).contenido for d in documentos} == {pdf, PNG}
+
+
+def test_pdf_de_varias_paginas_rechaza_todo_el_lote(cliente, entrar, sesion, crear_pdf):
+    entrar('encargada_salud')
+    respuesta = subir(cliente, [
+        ('archivos', ('foto.png', PNG, 'image/png')),
+        ('archivos', ('varias.pdf', crear_pdf(2), 'application/pdf')),
+    ])
+    assert respuesta.status_code == 400
+    assert 'una sola página' in respuesta.text
+    assert sesion.scalar(select(func.count()).select_from(DocumentoHistorico)) == 0
+    assert sesion.scalar(select(func.count()).select_from(Adjunto)) == 0

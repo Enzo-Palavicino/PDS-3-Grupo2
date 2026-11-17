@@ -6,6 +6,7 @@ import pytest
 from openai import OpenAI
 
 from app.config import Config
+from app.logs import configurar_logs
 from app.proveedores.llm import crear_proveedor_llm
 from app.proveedores.llm.base import ErrorLLM
 from app.proveedores.llm.fake import ProveedorLLMFake
@@ -164,3 +165,16 @@ def test_el_fake_separa_las_lecturas_de_las_respuestas_json():
     assert proveedor.generar_json("instrucciones", "entrada", ESQUEMA).texto == '{"a": 1}'
     assert proveedor.leer_imagen(b"dos", "image/jpeg").texto == "Segunda [ilegible]"
     assert proveedor.imagenes == [(b"uno", "image/png"), (b"dos", "image/jpeg")]
+
+
+def test_los_logs_del_sdk_no_publican_imagen_ni_texto_aun_en_debug(caplog):
+    caplog.set_level("DEBUG")
+    configurar_logs("DEBUG")
+    contenido = b"DOCUMENTO_FICTICIO_RESERVADO"
+    respuesta = respuesta_de_chat("LECTURA_FICTICIA_RESERVADA")
+    proveedor = ProveedorLLMOpenAI("clave", "gpt-6-luna", cliente_falso(respuesta, []))
+
+    proveedor.leer_imagen(contenido, "image/png")
+
+    assert "LECTURA_FICTICIA_RESERVADA" not in caplog.text
+    assert b64encode(contenido).decode("ascii") not in caplog.text

@@ -103,3 +103,37 @@ confirmada al subir es la referencia para las expresiones relativas; si falta, n
 Las pruebas fueron manuales con tres documentos ficticios, no una certificación de exactitud.
 El plan B (OCR local para impresos y transcripción asistida) no fue necesario para comprobar
 compatibilidad con imágenes. Resultados y decisión registrados en #17.
+
+## Procesamiento de documentos (E4-03)
+
+El mismo `Worker` procesa mensajes y documentos, también sin Telegram ni WhatsApp habilitados.
+`app.state.worker_documentos` apunta a esa instancia: la carga avisa después de confirmar la
+transacción. El documento avanza `subido` → `leido` → `por_revisar`; cada paso queda confirmado
+antes del siguiente. Si falla la extracción, no se vuelve a leer la imagen. Los fallos se
+reintentan a los 10 y 60 segundos; el tercero deja el documento en `error`.
+
+El contrato pendiente `procesar_documento` no tenía llamadores. Ahora recibe explícitamente
+`(sesion, documento_id, llm)` para reutilizar el proveedor del worker, sin crear clientes por
+documento. `extraer_registro` admite además referencia `None`, compatible con todos los
+llamadores anteriores. Sin fecha de referencia descarta cualquier fecha que no aparezca
+absolutamente en su propio fragmento; conserva la descripción de un control relativo.
+
+El residente y la fecha original informados al cargar son datos humanos, no decisiones de la IA.
+Si la lectura discrepa, se conserva la selección y se agrega una advertencia para revisión.
+La fecha de carga nunca sirve de referencia clínica. Los duplicados requieren mismo residente,
+misma fecha y al menos un diagnóstico coincidente en una atención firmada; quedan como posibles,
+sin incorporar ni descartar automáticamente.
+
+### PDF
+
+Por decisión de alcance de la entrega, se admiten **PDF de una página**, además de JPG/PNG.
+Se rechazan PDF inválidos, protegidos o de varias páginas antes de guardar el lote. Los PDF
+usados solo como adjuntos de ficha mantienen su comportamiento anterior.
+
+`pypdfium2` y Pillow convierten la página en un PNG en memoria, con un máximo de 2000 píxeles
+en su lado mayor. El original permanece intacto en la base de datos. PDFium se serializa con
+un lock porque no es seguro invocarlo concurrentemente desde el worker y las cargas web.
+
+Los logs del worker guardan solo id y tipo de error, sin trazas del documento. También se
+desactiva el detalle del SDK de OpenAI, que podría publicar cuerpos de peticiones en DEBUG.
+La extracción no incorpora datos clínicos ni crea atenciones: eso requiere la revisión E4-04.

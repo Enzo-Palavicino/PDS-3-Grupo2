@@ -3,8 +3,10 @@
 import os
 import shutil
 from datetime import UTC, date, datetime
+from io import BytesIO
 from pathlib import Path
 
+import pypdfium2 as pdfium
 import pytest
 from alembic import command
 from alembic.config import Config as ConfigAlembic
@@ -21,6 +23,18 @@ os.environ["STT_PROVIDER"] = "fake"
 os.environ["LLM_PROVIDER"] = "fake"
 
 RAIZ = Path(__file__).resolve().parent.parent
+
+
+@pytest.fixture
+def crear_pdf():
+    def crear(paginas=1, ancho=612, alto=792):
+        with pdfium.PdfDocument.new() as pdf:
+            for _ in range(paginas):
+                pdf.new_page(ancho, alto).close()
+            salida = BytesIO()
+            pdf.save(salida)
+            return salida.getvalue()
+    return crear
 
 
 def configuracion_alembic(url: str) -> ConfigAlembic:
