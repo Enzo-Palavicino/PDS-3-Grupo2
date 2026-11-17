@@ -31,9 +31,15 @@ def puede_firmar(usuario: UsuarioWeb, atencion: Atencion) -> bool:
     return atencion.estado != EstadoAtencion.FIRMADA and _es_autor(usuario, atencion)
 
 
+def puede_suspender_tratamiento(usuario: UsuarioWeb) -> bool:
+    """Suspender un tratamiento: cualquier profesional. La directora y la encargada de salud no."""
+    return usuario.rol == Rol.PROFESIONAL
+
+
 def _es_autor(usuario: UsuarioWeb, atencion: Atencion) -> bool:
     return (
         usuario.rol == Rol.PROFESIONAL
         and usuario.profesional_id is not None
         and usuario.profesional_id == atencion.profesional_id
     )
+
