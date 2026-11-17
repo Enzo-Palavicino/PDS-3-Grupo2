@@ -15,12 +15,13 @@
 </form>
 <p role="status">{{ residentes | length }} de {{ total }} residentes</p>
 <div class="card res-scroll"><table class="res-table">
-<thead><tr><th scope="col">Código</th><th scope="col">Nombre</th><th scope="col">Nivel</th><th scope="col">Estado</th><th scope="col">Ingreso inicial</th><th scope="col">Acciones</th></tr></thead>
+<thead><tr><th scope="col">Código</th><th scope="col">Nombre</th><th scope="col">Nivel</th><th scope="col">Estado</th><th scope="col">Ingreso inicial</th><th scope="col">Profesionales asignados</th><th scope="col">Acciones</th></tr></thead>
 <tbody>{% for residente in residentes %}<tr>
 <td>{{ residente.codigo }}</td><th scope="row">{{ residente.nombres }} {{ residente.apellidos }}{% if residente.apodo %}<br><small>{{ residente.apodo }}</small>{% endif %}</th>
 <td>{{ residente.nivel.replace('_', ' ').capitalize() }}</td><td>{{ residente.estado.capitalize() }}</td>
 <td>{{ residente.fecha_ingreso or "Sin fecha" }}</td>
-<td><a href="/residentes/{{ residente.id }}/editar">Editar / {{ "egresar" if residente.estado == "activo" else "reingresar" }}</a></td>
-</tr>{% else %}<tr><td colspan="6">{{ "No hay residentes que coincidan con los filtros." if total else "Aún no hay residentes registrados." }}</td></tr>{% endfor %}</tbody>
+<td>{% for profesional in asignados.get(residente.id, []) %}<div>{{ profesional.nombre }}<br><small>{{ profesional.especialidad }}{% if not profesional.activo %} · Desactivado, sin acceso{% endif %}</small></div>{% else %}Sin profesionales asignados{% endfor %}</td>
+<td><a href="/residentes/{{ residente.id }}/editar">Editar / {{ "egresar" if residente.estado == "activo" else "reingresar" }}</a><br><a href="/residentes/{{ residente.id }}/asignaciones">Asignar profesionales</a></td>
+</tr>{% else %}<tr><td colspan="7">{{ "No hay residentes que coincidan con los filtros." if total else "Aún no hay residentes registrados." }}</td></tr>{% endfor %}</tbody>
 </table></div>
 {% endblock %}

@@ -32,6 +32,7 @@ from app.proveedores.llm import crear_proveedor_llm
 from app.proveedores.stt import crear_proveedor_stt
 from app.web import (
     adjuntos,
+    asignaciones,
     atenciones,
     autenticacion,
     borradores,
@@ -152,6 +153,7 @@ def crear_app(config: Config | None = None) -> FastAPI:
         https_only=en_servidor,  # con HTTPS, la cookie de sesión solo viaja cifrada
     )
     app.include_router(autenticacion.router)
+    app.include_router(asignaciones.router)
     app.include_router(vinculos.router)
     app.include_router(borradores.router)
     app.include_router(residentes.router)

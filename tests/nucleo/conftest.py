@@ -4,7 +4,7 @@ transcripción falsos."""
 import pytest
 
 from app.canales.base import AdaptadorCanal
-from app.modelos import MensajeEntrante, Residente
+from app.modelos import Asignacion, MensajeEntrante, Residente
 from app.nucleo.mensajes import registrar_mensaje_entrante
 from app.nucleo.procesamiento import Contexto
 from app.proveedores.llm.fake import ProveedorLLMFake
@@ -112,9 +112,11 @@ def contexto(canal_falso, tmp_path) -> Contexto:
 
 
 @pytest.fixture
-def residentes_guardados(sesion, residentes) -> list[Residente]:
+def residentes_guardados(sesion, residentes, profesional) -> list[Residente]:
     """Los 4 residentes de la demo, guardados en la base de datos del test."""
     sesion.add_all(residentes)
+    sesion.flush()
+    sesion.add_all([Asignacion(residente_id=r.id, profesional_id=profesional.id) for r in residentes])
     sesion.commit()
     return residentes
 

@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.config import obtener_config
 from app.db import crear_fabrica_de_sesiones, crear_motor
-from app.modelos import Nivel, Profesional, Residente, Rol, UsuarioWeb
+from app.modelos import Asignacion, Nivel, Profesional, Residente, Rol, UsuarioWeb
 from app.seguridad import hashear_password
 
 # Edades al 2 de noviembre de 2026. Los dos "Tomás" sirven para probar nombres ambiguos.
@@ -91,6 +91,13 @@ def sembrar(sesion: Session, password: str) -> None:
                 hash_password=hashear_password(password),
             )
         )
+
+
+        # Solo al crear este profesional de demo
+        codigos = {"pediatra": ("RES-01", "RES-02"), "nutricionista": ("RES-02", "RES-03"),
+                   "kinesiologo": ("RES-03", "RES-04")}[usuario]
+        for residente_demo in sesion.scalars(select(Residente).where(Residente.codigo.in_(codigos))):
+            sesion.add(Asignacion(residente_id=residente_demo.id, profesional_id=profesional.id))
 
 
 def _existe(sesion: Session, columna, valor) -> bool:

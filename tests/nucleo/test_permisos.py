@@ -1,52 +1,63 @@
 import pytest
+from sqlalchemy import select
 
-from app.modelos import Atencion, EstadoAtencion, OrigenAtencion, Rol, UsuarioWeb
-from app.nucleo.permisos import puede_editar_atencion, puede_firmar, puede_ver_ficha
-
-AUTOR = UsuarioWeb(usuario="pediatra", rol=Rol.PROFESIONAL, profesional_id=1)
-OTRO_PROFESIONAL = UsuarioWeb(usuario="nutricionista", rol=Rol.PROFESIONAL, profesional_id=2)
-ENCARGADA = UsuarioWeb(usuario="encargada_salud", rol=Rol.ENCARGADA_SALUD)
-DIRECTORA = UsuarioWeb(usuario="directora", rol=Rol.DIRECTORA)
-
-
-def atencion(estado: EstadoAtencion) -> Atencion:
-    return Atencion(residente_id=1, profesional_id=1, origen=OrigenAtencion.WEB, estado=estado)
-
-
-@pytest.mark.parametrize(
-    ("usuario", "puede"),
-    [(AUTOR, True), (OTRO_PROFESIONAL, True), (ENCARGADA, True), (DIRECTORA, False)],
+from app.modelos import Asignacion, Atencion, EstadoAtencion, Profesional, UsuarioWeb
+from app.nucleo.permisos import (
+    puede_editar_atencion,
+    puede_firmar,
+    puede_registrar_atencion,
+    puede_ver_ficha,
 )
-def test_la_directora_no_ve_el_historial_clinico(sesion, usuario, puede):
-    assert puede_ver_ficha(sesion, usuario, residente_id=1) is puede
+from scripts.sembrar_datos import sembrar
 
 
-@pytest.mark.parametrize(
-    ("usuario", "puede"),
-    [(AUTOR, True), (ENCARGADA, True), (OTRO_PROFESIONAL, False), (DIRECTORA, False)],
-)
-def test_editan_un_borrador_su_autor_y_la_encargada(usuario, puede):
-    assert puede_editar_atencion(usuario, atencion(EstadoAtencion.BORRADOR)) is puede
+@pytest.fixture
+def datos(sesion):
+    sembrar(sesion, 'clave-de-prueba')
+    sesion.commit()
+    return {u.usuario: u for u in sesion.scalars(select(UsuarioWeb))}
 
 
-@pytest.mark.parametrize(
-    ("usuario", "puede"),
-    [(AUTOR, True), (ENCARGADA, False), (OTRO_PROFESIONAL, False), (DIRECTORA, False)],
-)
-def test_firma_solo_el_profesional_autor(usuario, puede):
-    assert puede_firmar(usuario, atencion(EstadoAtencion.BORRADOR)) is puede
+@pytest.mark.parametrize('nombre,residente,permiso', [
+    ('pediatra', 1, True), ('pediatra', 3, False), ('nutricionista', 2, True),
+    ('nutricionista', 1, False), ('encargada_salud', 4, True), ('directora', 1, False),
+])
+def test_lectura_y_registro(sesion, datos, nombre, residente, permiso):
+    assert puede_ver_ficha(sesion, datos[nombre], residente) is permiso
+    assert puede_registrar_atencion(sesion, datos[nombre], residente) is permiso
 
 
-@pytest.mark.parametrize("usuario", [AUTOR, ENCARGADA])
-def test_una_atencion_firmada_no_se_edita_ni_se_vuelve_a_firmar(usuario):
-    firmada = atencion(EstadoAtencion.FIRMADA)
+def test_edicion_firma_retiro_e_inactividad(sesion, datos):
+    autor = datos['pediatra']
+    atencion = Atencion(residente_id=1, profesional_id=autor.profesional_id, origen='web', estado='borrador')
+    assert puede_editar_atencion(autor, atencion)
+    assert puede_firmar(autor, atencion)
+    assert puede_editar_atencion(datos['encargada_salud'], atencion)
+    assert not puede_firmar(datos['encargada_salud'], atencion)
+    assert not puede_editar_atencion(datos['directora'], atencion)
+    assert not puede_firmar(datos['nutricionista'], atencion)
+    atencion.estado = EstadoAtencion.FIRMADA
+    assert not puede_firmar(autor, atencion)
+    assert not puede_editar_atencion(datos['encargada_salud'], atencion)
+    atencion.estado = EstadoAtencion.BORRADOR
+    asignacion = sesion.scalar(select(Asignacion).where(Asignacion.residente_id == 1, Asignacion.profesional_id == autor.profesional_id))
+    sesion.delete(asignacion)
+    sesion.flush()
+    assert not puede_firmar(autor, atencion)
+    assert not puede_editar_atencion(autor, atencion)
+    assert not puede_ver_ficha(sesion, autor, 1)
+    assert puede_ver_ficha(sesion, autor, 2)
+    sesion.get(Profesional, autor.profesional_id).activo = False
+    sesion.flush()
+    assert not puede_ver_ficha(sesion, autor, 2)
 
-    assert not puede_editar_atencion(usuario, firmada)
-    assert not puede_firmar(usuario, firmada)
 
-
-def test_un_usuario_profesional_sin_profesional_no_es_autor_de_nada():
-    sin_profesional = UsuarioWeb(usuario="incompleto", rol=Rol.PROFESIONAL, profesional_id=None)
-    huerfana = Atencion(residente_id=1, origen=OrigenAtencion.HISTORICO, estado="borrador")
-
-    assert not puede_firmar(sin_profesional, huerfana)
+def test_usuario_inactivo_o_objeto_desconectado_no_autoriza(sesion, datos):
+    autor = datos['pediatra']
+    autor.activo = False
+    assert not puede_ver_ficha(sesion, autor, 1)
+    autor.activo = True
+    atencion = Atencion(residente_id=1, profesional_id=autor.profesional_id, estado='borrador')
+    sesion.expunge(autor)
+    assert not puede_firmar(autor, atencion)
+    assert not puede_editar_atencion(autor, atencion)

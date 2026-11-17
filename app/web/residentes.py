@@ -6,8 +6,18 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 
-from app.modelos import EstadoResidente, Nivel, Residente, Rol, UsuarioWeb
+from app.modelos import (
+    Asignacion,
+    EstadoResidente,
+    Nivel,
+    Profesional,
+    Residente,
+    Rol,
+    TipoActor,
+    UsuarioWeb,
+)
 from app.nucleo import residentes as servicio
+from app.nucleo.auditoria import Accion, registrar_evento
 from app.web.autenticacion import SesionBD, exigir_rol, verificar_csrf
 from app.web.plantillas import pagina
 
@@ -27,7 +37,26 @@ def obtener(sesion, residente_id):
     return residente
 
 
-def formulario(request, usuario, residente=None, valores=None, **extra):
+def formulario(
+    request,
+    usuario,
+    residente=None,
+    valores=None,
+    sesion=None,
+    seleccionados=None,
+    **extra,
+):
+    profesionales = (
+        list(
+            sesion.scalars(
+                select(Profesional)
+                .where(Profesional.activo)
+                .order_by(Profesional.nombre)
+            )
+        )
+        if sesion is not None and residente is None
+        else []
+    )
     if valores is None:
         valores = (
             {
@@ -49,6 +78,8 @@ def formulario(request, usuario, residente=None, valores=None, **extra):
         "residente_formulario.html",
         usuario=usuario,
         residente=residente,
+        profesionales=profesionales,
+        seleccionados=seleccionados or [],
         valores=valores,
         niveles=NIVELES,
         hoy=servicio.hoy(),
@@ -88,9 +119,18 @@ def listar(
         and (not nivel or r.nivel == nivel)
         and (not estado or r.estado == estado)
     ]
+    asignados = {}
+    for residente_id, profesional in sesion.execute(
+        select(Asignacion.residente_id, Profesional)
+        .join(Profesional)
+        .where(Asignacion.residente_id.in_([r.id for r in filas]))
+        .order_by(Profesional.nombre)
+    ):
+        asignados.setdefault(residente_id, []).append(profesional)
     return pagina(
         request,
         "residentes.html",
+        asignados=asignados,
         usuario=usuario,
         residentes=filas,
         total=len(todos),
@@ -103,8 +143,8 @@ def listar(
 
 
 @router.get("/nuevo")
-def nuevo(request: Request, usuario: Administracion):
-    return formulario(request, usuario)
+def nuevo(request: Request, sesion: SesionBD, usuario: Administracion):
+    return formulario(request, usuario, sesion=sesion)
 
 
 @router.get("/{residente_id}/editar")
@@ -128,6 +168,7 @@ def guardar(
     fecha_nacimiento: Annotated[str, Form()] = "",
     fecha_ingreso: Annotated[str, Form()] = "",
     confirmar_duplicado: Annotated[bool, Form()] = False,
+    profesionales_ids: Annotated[list[int] | None, Form()] = None,
 ):
     residente = obtener(sesion, residente_id) if residente_id is not None else None
     valores = {
@@ -139,6 +180,22 @@ def guardar(
         "fecha_ingreso": fecha_ingreso,
     }
     try:
+        seleccionados = set(profesionales_ids or [])
+        if residente is not None and seleccionados:
+            raise ValueError(
+                "Modifica las asignaciones desde Administrar profesionales asignados."
+            )
+        activos = set(
+            sesion.scalars(
+                select(Profesional.id)
+                .where(Profesional.id.in_(seleccionados), Profesional.activo)
+                .with_for_update()
+            )
+        )
+        if activos != seleccionados:
+            raise ValueError(
+                "Algún profesional seleccionado ya no está disponible. Revisa la selección."
+            )
         datos = servicio.datos_validos(valores)
         coincidencias = servicio.duplicados(sesion, datos, residente_id)
         if coincidencias and not confirmar_duplicado:
@@ -147,15 +204,41 @@ def guardar(
                 usuario,
                 residente,
                 valores,
+                sesion=sesion,
+                seleccionados=profesionales_ids,
                 duplicados=coincidencias,
                 status_code=409,
             )
-        servicio.guardar(sesion, datos, usuario.id, residente)
+        guardado = servicio.guardar(sesion, datos, usuario.id, residente)
+        for profesional_id in sorted(activos):
+            sesion.add(
+                Asignacion(
+                    residente_id=guardado.id,
+                    profesional_id=profesional_id,
+                    asignado_por=usuario.id,
+                )
+            )
+            registrar_evento(
+                sesion,
+                Accion.ASIGNACION_CREADA,
+                TipoActor.USUARIO,
+                actor_id=usuario.id,
+                entidad="residente",
+                entidad_id=guardado.id,
+                detalle={"profesional_id": profesional_id},
+            )
         sesion.commit()
     except ValueError as exc:
         sesion.rollback()
         return formulario(
-            request, usuario, residente, valores, error=str(exc), status_code=400
+            request,
+            usuario,
+            residente,
+            valores,
+            sesion=sesion,
+            seleccionados=profesionales_ids,
+            error=str(exc),
+            status_code=400,
         )
     request.session["residente_exito"] = (
         "Residente actualizado exitosamente."

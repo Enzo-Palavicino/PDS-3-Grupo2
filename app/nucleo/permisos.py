@@ -1,34 +1,87 @@
-"""Quién puede hacer qué sobre la ficha clínica.
+"""Permisos clínicos por rol y asignación vigente.
 
-A la ficha accede quien participa en la atención (Ley 20.584, art. 13): la encargada de salud
-ve todas las fichas y la directora solo los datos administrativos, nunca el historial clínico.
-
-Esta es la versión por rol. Cuando existan las asignaciones (E2-03), un profesional verá solo
-las fichas de los residentes que tiene asignados, sin cambiar las firmas de estas funciones.
-
-La web las usa para responder 403; los botones que oculta son solo una ayuda visual.
+Se conservan las firmas compartidas. Edición y firma obtienen la sesión de los objetos
+ORM; objetos desconectados no autorizan a un profesional (fallo seguro).
 """
 
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.orm import Session, object_session
 
-from app.modelos import Atencion, EstadoAtencion, Rol, UsuarioWeb
+from app.modelos import (
+    Asignacion,
+    Atencion,
+    EstadoAtencion,
+    Profesional,
+    Residente,
+    Rol,
+    UsuarioWeb,
+)
+
+
+class SinAsignacion(PermissionError):
+    """No se permite registrar para el residente indicado."""
+
+
+def residentes_asignados(profesional_id: int | None):
+    """Subconsulta para filtrar listados sin cargar fichas no autorizadas."""
+    return (
+        select(Asignacion.residente_id)
+        .join(Profesional)
+        .where(Asignacion.profesional_id == profesional_id, Profesional.activo)
+    )
+
+
+def profesional_asignado(
+    sesion: Session, profesional_id: int | None, residente_id: int
+) -> bool:
+    return (
+        profesional_id is not None
+        and sesion.scalar(
+            residentes_asignados(profesional_id).where(
+                Asignacion.residente_id == residente_id
+            )
+        )
+        is not None
+    )
 
 
 def puede_ver_ficha(sesion: Session, usuario: UsuarioWeb, residente_id: int) -> bool:
-    """Ver el historial clínico de un residente. sesion queda para revisar las asignaciones."""
-    return usuario.rol in (Rol.ENCARGADA_SALUD, Rol.PROFESIONAL)
+    if usuario.activo is False or sesion.get(Residente, residente_id) is None:
+        return False
+    if usuario.rol == Rol.ENCARGADA_SALUD:
+        return True
+    return usuario.rol == Rol.PROFESIONAL and profesional_asignado(
+        sesion, usuario.profesional_id, residente_id
+    )
+
+
+def puede_registrar_atencion(
+    sesion: Session, usuario: UsuarioWeb, residente_id: int
+) -> bool:
+    return puede_ver_ficha(sesion, usuario, residente_id)
+
+
+def _acceso(usuario: UsuarioWeb, atencion: Atencion) -> bool:
+    sesion = object_session(usuario) or object_session(atencion)
+    return sesion is not None and puede_ver_ficha(
+        sesion, usuario, atencion.residente_id
+    )
 
 
 def puede_editar_atencion(usuario: UsuarioWeb, atencion: Atencion) -> bool:
-    """Editar una atención en borrador: su profesional autor o la encargada de salud."""
-    if atencion.estado == EstadoAtencion.FIRMADA:
-        return False
-    return usuario.rol == Rol.ENCARGADA_SALUD or _es_autor(usuario, atencion)
+    return (
+        atencion.estado != EstadoAtencion.FIRMADA
+        and _acceso(usuario, atencion)
+        and (usuario.rol == Rol.ENCARGADA_SALUD or _es_autor(usuario, atencion))
+    )
 
 
 def puede_firmar(usuario: UsuarioWeb, atencion: Atencion) -> bool:
-    """Firmar una atención en borrador: solo su profesional autor."""
-    return atencion.estado != EstadoAtencion.FIRMADA and _es_autor(usuario, atencion)
+    return (
+        atencion.estado != EstadoAtencion.FIRMADA
+        and _es_autor(usuario, atencion)
+        and _acceso(usuario, atencion)
+    )
 
 
 def puede_suspender_tratamiento(usuario: UsuarioWeb) -> bool:

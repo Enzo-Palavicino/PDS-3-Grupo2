@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 
 from app.db import ahora
 from app.modelos import (
+    Asignacion,
     BorradorAtencion,
     BorradorMensaje,
     EstadoBorrador,
@@ -166,6 +167,8 @@ def test_la_respuesta_de_otro_profesional_crea_un_borrador_nuevo(
     borrador = unico_borrador(sesion)
     otro = Profesional(nombre="Otro profesional", especialidad="nutrición")
     sesion.add(otro)
+    sesion.flush()
+    sesion.add(Asignacion(residente_id=1, profesional_id=otro.id))
     sesion.commit()
 
     respuesta = registrar_mensaje_entrante(

@@ -8,7 +8,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.modelos import (
@@ -27,6 +27,7 @@ from app.modelos import (
 from app.nucleo.auditoria import Accion, registrar_evento
 from app.nucleo.borradores import sin_actividad
 from app.nucleo.campos import ETIQUETAS
+from app.nucleo.permisos import puede_ver_ficha, residentes_asignados
 from app.web.autenticacion import SesionBD, exigir_rol, verificar_csrf
 from app.web.plantillas import pagina
 
@@ -46,7 +47,9 @@ def lista_de_borradores(request: Request, sesion: SesionBD, usuario: LectorDeBor
         .order_by(BorradorAtencion.id.desc())
     )
     if usuario.rol == Rol.PROFESIONAL:
-        consulta = consulta.where(BorradorAtencion.profesional_id == usuario.profesional_id)
+        consulta = consulta.where(BorradorAtencion.profesional_id == usuario.profesional_id,
+            or_(BorradorAtencion.residente_id.is_(None),
+                BorradorAtencion.residente_id.in_(residentes_asignados(usuario.profesional_id))))
     filas = sesion.execute(consulta).all()
     dias = _dias_sin_actividad(request)
     return pagina(
@@ -74,7 +77,10 @@ def detalle_de_borrador(
     extracciones = sesion.scalars(
         select(Extraccion).where(Extraccion.borrador_id == borrador.id).order_by(Extraccion.id)
     ).all()
-    nombres = {r.codigo: f"{r.nombres} {r.apellidos}" for r in sesion.scalars(select(Residente))}
+    consulta_nombres = select(Residente)
+    if usuario.rol == Rol.PROFESIONAL:
+        consulta_nombres = consulta_nombres.where(Residente.id.in_(residentes_asignados(usuario.profesional_id)))
+    nombres = {r.codigo: f"{r.nombres} {r.apellidos}" for r in sesion.scalars(consulta_nombres)}
 
     # Cada lectura queda registrada: quién abrió qué borrador y cuándo (D41, art. 9).
     registrar_evento(
@@ -132,6 +138,8 @@ def _borrador_visible(sesion: Session, borrador_id: int, usuario: UsuarioWeb) ->
         raise HTTPException(404, "Ese borrador no existe.")
     if usuario.rol == Rol.PROFESIONAL and borrador.profesional_id != usuario.profesional_id:
         raise HTTPException(403, "Este borrador es de otro profesional.")
+    if usuario.rol == Rol.PROFESIONAL and borrador.residente_id is not None and not puede_ver_ficha(sesion, usuario, borrador.residente_id):
+        raise HTTPException(403, "No tienes asignación para este residente.")
     return borrador
 
 
