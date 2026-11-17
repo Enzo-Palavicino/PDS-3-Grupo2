@@ -10,12 +10,17 @@ sin que nadie los copie a mano:
 
 Los diagnósticos no se copian: quedan en el historial, que son las atenciones firmadas.
 
+Si la atención es una adenda, antes se retira lo que aportó la atención que corrige: sus
+tratamientos vigentes quedan suspendidos y sus controles pendientes, anulados. Así la ficha no
+muestra a la vez el dato corregido y el original.
+
 Se usa a través de app.nucleo.atenciones.incorporar_a_ficha, que es el contrato del esqueleto.
 """
 
 from datetime import date, datetime
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import ahora
@@ -29,8 +34,10 @@ from app.modelos import (
     OrigenAtencion,
     TipoAntecedente,
     Tratamiento,
+    UsuarioWeb,
 )
 from app.nucleo.extraccion import ZONA_HORARIA
+from app.nucleo.tratamientos import estado_vigente, suspender_tratamiento
 
 ANTECEDENTES = {
     "alergias": TipoAntecedente.ALERGIA,
@@ -49,6 +56,8 @@ def incorporar(sesion: Session, atencion: Atencion, momento: datetime | None = N
         return
     momento = momento or ahora()
     hoy = momento.astimezone(ZONA_HORARIA).date()
+    if atencion.corrige_a_id is not None:
+        _retirar_lo_corregido(sesion, atencion, momento)
     campos = atencion.campos or {}
     autor = atencion.firmada_por or atencion.verificada_por or atencion.creado_por
 
@@ -74,6 +83,28 @@ def incorporar(sesion: Session, atencion: Atencion, momento: datetime | None = N
     if medicion := _medicion(atencion, campos.get("mediciones")):
         sesion.add(medicion)
     atencion.incorporada_en = momento
+
+
+def _retirar_lo_corregido(sesion: Session, adenda: Atencion, momento: datetime) -> None:
+    """Suspende los tratamientos vigentes y anula los controles pendientes de la atención que la
+    adenda corrige. La suspensión queda a nombre de quien firmó la adenda."""
+    firmante = sesion.get(UsuarioWeb, adenda.firmada_por)
+    motivo = f"Corregido por la atención #{adenda.id}"
+    hoy = momento.astimezone(ZONA_HORARIA).date()
+    tratamientos = sesion.scalars(
+        select(Tratamiento).where(Tratamiento.atencion_id == adenda.corrige_a_id)
+    )
+    for tratamiento in tratamientos:
+        if estado_vigente(tratamiento, hoy) == EstadoTratamiento.ACTIVO:
+            suspender_tratamiento(sesion, tratamiento, firmante, motivo, momento)
+    controles = sesion.scalars(
+        select(Control).where(
+            Control.atencion_id == adenda.corrige_a_id,
+            Control.estado == EstadoControl.PENDIENTE,
+        )
+    )
+    for control in controles:
+        control.estado = EstadoControl.ANULADO
 
 
 def _tratamiento(atencion: Atencion, indicacion: Any, hoy: date) -> Tratamiento | None:
