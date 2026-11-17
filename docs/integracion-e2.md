@@ -42,3 +42,64 @@ no entrega datos clínicos.
 Ejecutar `ruff check .` y `pytest`. El workflow de GitHub verifica Python 3.11, Python 3.13 y
 las migraciones en PostgreSQL. Antes de integrar un PR dependiente, actualizarlo con `Develop`
 y resolver los conflictos conservando las rutas y enlaces de ambas tareas.
+
+## Prueba de lectura de manuscritos (E4-01)
+
+El script no usa la base de datos ni activa los bots. Configurar `LLM_PROVIDER=openai`,
+`LLM_MODEL=gpt-6-luna` y `OPENAI_API_KEY` en el `.env` local, sin publicar la clave:
+
+```bash
+python -m scripts.probar_lectura_imagen --datos-ficticios /ruta/documento.jpg
+```
+
+Admite una imagen JPG o PNG de hasta 10 MB, validada por sus bytes. Devuelve la transcripción
+literal, las marcas `[ilegible]`, el modelo solicitado, el modelo usado y el tiempo de respuesta.
+No interpreta el documento ni resuelve fechas relativas. Rechazos, respuestas truncadas o
+vacías y errores de red/API terminan con código de error; no cuentan como prueba aprobada.
+
+Contrato implementado en OpenAI y fake:
+
+```python
+leer_imagen(contenido: bytes, mime: str) -> ResultadoLLM
+# ResultadoLLM.texto: transcripción literal; ResultadoLLM.modelo: modelo usado.
+```
+
+El flujo propuesto es imagen → texto literal → seudonimización → extractor existente. El texto
+literal y su modelo se guardarán antes de extraer, para poder reintentar sin releer la imagen.
+La imagen no se puede seudonimizar antes de enviarla: solo se prueban documentos ficticios.
+El proveedor fake sirve para tests, no demuestra capacidad del modelo del curso.
+
+### Resultado real del spike (17 de noviembre de 2026)
+
+La key del curso aceptó las tres fotos JPG de manuscritos ficticios preparados por el equipo.
+Modelo solicitado y devuelto: `gpt-6-luna`. Se probaron dos pasadas; la segunda incorpora una
+instrucción explícita para no reconstruir tachaduras y razonamiento `medium` en la lectura.
+
+| Muestra | Primera pasada | Configuración final | Observación |
+| --- | --- | --- | --- |
+| Ficha completa | 9,27 s | 10,93 s | Reconoce residente, antecedentes, peso, talla y control. Persiste un error: lee la fecha como 12/08/2016; el autor confirmó 12/08/2026. El año de hospitalización mejoró de 2016 a 2026. |
+| Seguimiento con tratamiento ficticio | 11,46 s | 14,44 s | Conserva el diagnóstico vacío. Hay variación entre pasadas: la segunda lee 2016 en algunas fechas que la primera leyó como 2026. |
+| Ficha sin fecha y con tachadura | 10,23 s | 9,02 s | Conserva fecha y talla vacías, peso 11,2 kg y “en dos semanas”. Con la configuración final marca la palabra tachada como `[ilegible]`. |
+
+Ejemplo literal de la última lectura:
+
+```text
+Peso (kg)
+11,2 Kg
+Talla (cm)
+
+Proximo control
+en dos semanas
+
+Observaciones
+probando una [ilegible] tachada
+```
+
+**Decisión:** usar `leer_imagen` para lectura asistida, seguida de seudonimización y extracción.
+No es una transcripción fiable sin revisión: los errores de año y la variación entre pasadas
+obligan a comparar y corregir cada dato contra el original antes de incorporar (E4-04).
+No se corrigen fechas automáticamente usando los guiones ni la fecha actual. La fecha original
+confirmada al subir es la referencia para las expresiones relativas; si falta, no se usa hoy.
+Las pruebas fueron manuales con tres documentos ficticios, no una certificación de exactitud.
+El plan B (OCR local para impresos y transcripción asistida) no fue necesario para comprobar
+compatibilidad con imágenes. Resultados y decisión registrados en #17.
