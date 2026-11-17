@@ -40,6 +40,7 @@ from app.web import (
     firma,
     profesionales,
     residentes,
+    tratamientos,
     vinculos,
 )
 from app.web.autenticacion import SesionRequerida
@@ -158,6 +159,7 @@ def crear_app(config: Config | None = None) -> FastAPI:
     app.include_router(fichas.router)
     app.include_router(atenciones.router)
     app.include_router(firma.router)
+    app.include_router(tratamientos.router)
     app.include_router(adjuntos.router)
     app.include_router(digitalizacion.router)
     app.include_router(webhook_telegram.router)
