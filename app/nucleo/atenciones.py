@@ -109,6 +109,8 @@ def crear_atencion(
     fecha_atencion: date | None = None,
     borrador_id: int | None = None,
     documento_id: int | None = None,
+    corrige_a_id: int | None = None,
+    motivo_correccion: str | None = None,
 ) -> Atencion:
     """Crea una atención en borrador y la audita (atencion_creada).
 
@@ -119,6 +121,8 @@ def crear_atencion(
     - borrador_id: el borrador de la IA del que viene. Tiene que estar pendiente y sin atención.
     - documento_id: el documento histórico del que viene; el documento queda apuntando a la
       atención.
+    - corrige_a_id y motivo_correccion: si es una adenda, la atención firmada que corrige y por
+      qué. Para crear una adenda se usa app/nucleo/adendas.crear_adenda, que valida la original.
 
     Lanza DatosIncompletos si faltan el residente, la fecha o el motivo o diagnóstico (en una
     atención histórica la fecha puede faltar), y ErrorDeAtencion si algún dato no es válido.
@@ -139,7 +143,14 @@ def crear_atencion(
     else:
         profesional_id = None
     campos, fecha = _preparar(sesion, campos, fecha_atencion, residente, profesional_id, origen)
-    original = borrador.campos if borrador else documento.campos if documento else None
+    if borrador is not None:
+        original = borrador.campos
+    elif documento is not None:
+        original = documento.campos
+    elif corrige_a_id is not None:
+        original = sesion.get(Atencion, corrige_a_id).campos
+    else:
+        original = None
 
     atencion = Atencion(
         residente_id=residente_id,
@@ -150,6 +161,8 @@ def crear_atencion(
         campos=campos,
         campos_editados=_campos_distintos(original, campos) if original is not None else [],
         borrador_id=borrador_id,
+        corrige_a_id=corrige_a_id,
+        motivo_correccion=motivo_correccion,
         creado_por=autor.id,
     )
     sesion.add(atencion)
@@ -163,7 +176,8 @@ def crear_atencion(
         actor_id=autor.id,
         entidad="atencion",
         entidad_id=atencion.id,
-        detalle={"origen": origen, "residente_id": residente_id},
+        detalle={"origen": origen, "residente_id": residente_id}
+        | ({"corrige_a": corrige_a_id} if corrige_a_id is not None else {}),
     )
     return atencion
 
@@ -385,9 +399,12 @@ def _documento_disponible(
 
 
 def _original_de(sesion: Session, atencion: Atencion) -> dict[str, Any] | None:
-    """Lo que extrajo la IA para esta atención, si vino de un borrador o de un documento."""
+    """Contra qué se miden los cambios a mano: lo que extrajo la IA, si vino de un borrador o de
+    un documento, o la atención que corrige, si es una adenda."""
     if atencion.borrador_id is not None:
         return sesion.get(BorradorAtencion, atencion.borrador_id).campos
+    if atencion.corrige_a_id is not None:
+        return sesion.get(Atencion, atencion.corrige_a_id).campos
     documento = sesion.scalar(
         select(DocumentoHistorico).where(DocumentoHistorico.atencion_id == atencion.id)
     )

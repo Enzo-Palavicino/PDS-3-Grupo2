@@ -85,6 +85,7 @@ class EstadoTratamiento(StrEnum):
 class EstadoControl(StrEnum):
     PENDIENTE = "pendiente"
     REALIZADO = "realizado"
+    ANULADO = "anulado"  # lo reemplazó una corrección (adenda) de su atención
 
 
 class TipoAntecedente(StrEnum):

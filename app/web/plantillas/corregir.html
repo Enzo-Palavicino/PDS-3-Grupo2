@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{%- from "ui/formularios.html" import csrf_field -%}
+{%- from "ui/encabezados.html" import page_header -%}
+{%- from "ui/avisos.html" import alert -%}
+{% block titulo %}Corregir atención{% endblock %}
+{% block contenido %}
+{{ page_header("Corregir la atención #" ~ atencion.id, "Una atención firmada no se modifica. La corrección es una atención nueva que parte con una copia de esta: cambias lo que estaba mal y la firmas. La original queda como estaba, marcada como corregida.") }}
+{% if error %}{% call alert("danger", role="alert") %}{{ error }}{% endcall %}{% endif %}
+<form class="card password-form" method="post" action="/atenciones/{{ atencion.id }}/corregir" data-enviando="Creando…">
+  {{ csrf_field(csrf) }}
+  <p>
+    <label for="motivo">Motivo de la corrección</label><br>
+    <textarea id="motivo" name="motivo" rows="3" required maxlength="1000"></textarea>
+  </p>
+  <button class="btn btn--primary">Crear corrección</button>
+</form>
+{% endblock %}
