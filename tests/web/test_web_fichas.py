@@ -256,9 +256,10 @@ def test_los_accesos_dependen_del_rol(cliente, entrar, emilia):
     assert nueva in html
     assert digitalizar not in html
 
-    # "Nueva atención" sigue a permisos.puede_registrar_atencion, que hoy incluye a la encargada.
     entrar("encargada_salud")
-    assert digitalizar in cliente.get(f"/residentes/{emilia.id}").text
+    html = cliente.get(f"/residentes/{emilia.id}").text
+    assert digitalizar in html
+    assert nueva not in html  # la encargada no registra atenciones (E3-01)
 
 
 # Listado de fichas y enlaces

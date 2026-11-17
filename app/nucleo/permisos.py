@@ -58,7 +58,9 @@ def puede_ver_ficha(sesion: Session, usuario: UsuarioWeb, residente_id: int) -> 
 def puede_registrar_atencion(
     sesion: Session, usuario: UsuarioWeb, residente_id: int
 ) -> bool:
-    return puede_ver_ficha(sesion, usuario, residente_id)
+    """Registrar una atención: solo un profesional con el residente asignado (E3-01). La
+    encargada de salud ve todas las fichas, pero no registra atenciones."""
+    return usuario.rol == Rol.PROFESIONAL and puede_ver_ficha(sesion, usuario, residente_id)
 
 
 def _acceso(usuario: UsuarioWeb, atencion: Atencion) -> bool:
