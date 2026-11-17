@@ -15,7 +15,13 @@ from app.modelos import (
     Rol,
     UsuarioWeb,
 )
-from app.nucleo.adendas import CorreccionEnCurso, adenda_en_curso, crear_adenda
+from app.nucleo.adendas import (
+    AtencionYaCorregida,
+    CorreccionEnCurso,
+    adenda_en_curso,
+    crear_adenda,
+    ultima_version,
+)
 from app.nucleo.atenciones import AtencionFirmada, ErrorDeAtencion, firmar_atencion
 from app.nucleo.permisos import puede_firmar
 from app.nucleo.timbres import (
@@ -153,6 +159,10 @@ def pantalla_de_correccion(
     en_curso = adenda_en_curso(sesion, original)
     if en_curso is not None:
         return RedirectResponse(f"/atenciones/{en_curso.id}", status_code=303)
+    ultima = ultima_version(sesion, original)
+    if ultima.id != original.id:
+        # Ya fue corregida: se corrige la última versión.
+        return RedirectResponse(f"/atenciones/{ultima.id}/corregir", status_code=303)
     return pagina(request, "corregir.html", usuario=usuario, atencion=original)
 
 
@@ -169,6 +179,8 @@ def corregir(
         adenda = crear_adenda(sesion, original, usuario, motivo)
     except CorreccionEnCurso as error:
         return RedirectResponse(f"/atenciones/{error.adenda.id}", status_code=303)
+    except AtencionYaCorregida as error:
+        return RedirectResponse(f"/atenciones/{error.ultima.id}/corregir", status_code=303)
     except ErrorDeAtencion as error:
         return pagina(
             request,

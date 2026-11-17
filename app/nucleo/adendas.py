@@ -5,6 +5,10 @@ otra atención que la corrige. La adenda empieza con una copia de los campos de 
 profesional cambia lo que estaba mal y la firma como cualquier atención. Al firmarla, la ficha
 reemplaza lo que aportó la original (ver app/nucleo/incorporacion.py). La original no cambia y
 sigue verificando su integridad.
+
+Cada atención se corrige a lo más una vez: para volver a corregir, se corrige la última versión
+(la adenda también es una atención firmada). Así se forma una cadena original → adenda 1 →
+adenda 2, y cada firma retira lo de la versión anterior.
 """
 
 from sqlalchemy import select
@@ -22,6 +26,14 @@ class CorreccionEnCurso(ErrorDeAtencion):
         self.adenda = adenda
 
 
+class AtencionYaCorregida(ErrorDeAtencion):
+    """La atención ya tiene una adenda firmada: se corrige la última versión, no esta."""
+
+    def __init__(self, ultima: Atencion):
+        super().__init__(f"Esta atención ya fue corregida: corrige la atención #{ultima.id}.")
+        self.ultima = ultima
+
+
 def crear_adenda(
     sesion: Session, original: Atencion, usuario: UsuarioWeb, motivo: str
 ) -> Atencion:
@@ -29,8 +41,13 @@ def crear_adenda(
     No hace commit.
 
     Lanza ErrorDeAtencion si falta el motivo, si la original no está firmada o si quien corrige
-    no es su profesional autor, y CorreccionEnCurso si ya hay una adenda sin firmar.
+    no es su profesional autor; CorreccionEnCurso si ya hay una adenda sin firmar, y
+    AtencionYaCorregida si ya tiene una adenda firmada.
     """
+    # Bloquea la fila de la original hasta el final de la transacción: si llegan dos envíos a la
+    # vez, el segundo espera y encuentra la adenda que creó el primero. En PostgreSQL es un
+    # SELECT ... FOR UPDATE; en SQLite las escrituras ya van de a una (BEGIN IMMEDIATE).
+    sesion.refresh(original, with_for_update=True)
     motivo = (motivo or "").strip()
     if not motivo:
         raise ErrorDeAtencion("Indica el motivo de la corrección.")
@@ -46,6 +63,8 @@ def crear_adenda(
     en_curso = adenda_en_curso(sesion, original)
     if en_curso is not None:
         raise CorreccionEnCurso(en_curso)
+    if correcciones_de(sesion, original):
+        raise AtencionYaCorregida(ultima_version(sesion, original))
     return crear_atencion(
         sesion,
         original.residente_id,
@@ -81,3 +100,12 @@ def correcciones_de(sesion: Session, atencion: Atencion) -> list[Atencion]:
             .order_by(Atencion.firmada_en, Atencion.id)
         )
     )
+
+
+def ultima_version(sesion: Session, atencion: Atencion) -> Atencion:
+    """La versión vigente de una atención: sigue la cadena de adendas firmadas hasta la última.
+    Si no tiene correcciones, es la misma atención."""
+    actual = atencion
+    while correcciones := correcciones_de(sesion, actual):
+        actual = correcciones[-1]
+    return actual

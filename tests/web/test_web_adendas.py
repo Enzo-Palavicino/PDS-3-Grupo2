@@ -85,6 +85,23 @@ def test_con_una_correccion_en_curso_lleva_a_esa(cliente, entrar, sesion, crear)
     assert len(adendas_de(sesion, atencion_id)) == 1
 
 
+def test_una_atencion_ya_corregida_lleva_a_corregir_la_ultima_version(
+    cliente, entrar, sesion, crear, pediatra
+):
+    atencion_id = crear()
+    adenda = crear_adenda(sesion, sesion.get(Atencion, atencion_id), pediatra, "Dosis")
+    firmar_atencion(sesion, adenda, pediatra, PASSWORD)
+    sesion.commit()
+    entrar("pediatra")
+
+    respuesta_get = cliente.get(f"/atenciones/{atencion_id}/corregir", follow_redirects=False)
+    respuesta_post = corregir(cliente, atencion_id, motivo="Otro error")
+
+    assert respuesta_get.headers["location"] == f"/atenciones/{adenda.id}/corregir"
+    assert respuesta_post.headers["location"] == f"/atenciones/{adenda.id}/corregir"
+    assert len(adendas_de(sesion, atencion_id)) == 1
+
+
 def test_sin_motivo_vuelve_con_el_error(cliente, entrar, sesion, crear):
     atencion_id = crear()
     entrar("pediatra")

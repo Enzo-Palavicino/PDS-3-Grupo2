@@ -2,12 +2,14 @@ import pytest
 from sqlalchemy import select
 
 from app.modelos import (
+    Antecedente,
     Atencion,
     Control,
     EstadoAtencion,
     EstadoControl,
     EstadoTratamiento,
     EventoAuditoria,
+    Medicion,
     OrigenAtencion,
     Profesional,
     Rol,
@@ -15,10 +17,12 @@ from app.modelos import (
     UsuarioWeb,
 )
 from app.nucleo.adendas import (
+    AtencionYaCorregida,
     CorreccionEnCurso,
     adenda_en_curso,
     correcciones_de,
     crear_adenda,
+    ultima_version,
 )
 from app.nucleo.atenciones import (
     ErrorDeAtencion,
@@ -35,6 +39,8 @@ CAMPOS = {
     "motivo": {"valor": "Control pediátrico", "fragmento": None},
     "indicaciones_farmacologicas": [{"medicamento": "salbutamol", "dosis": "dos puff"}],
     "proximo_control": {"fecha": "2026-11-16", "descripcion": "Control en dos semanas"},
+    "alergias": [{"valor": "penicilina", "fragmento": None}],
+    "mediciones": {"peso_kg": 9.8, "talla_cm": 74, "fragmento": None},
 }
 
 
@@ -64,15 +70,16 @@ def original(sesion, residente, autor) -> Atencion:
     return atencion
 
 
-def corregir(sesion, original, autor) -> Atencion:
-    """Crea la adenda, cambia el medicamento y el control, y la firma."""
+CAMBIO_DE_MEDICAMENTO = {
+    "indicaciones_farmacologicas": [{"medicamento": "amoxicilina", "dosis": "5 ml"}],
+    "proximo_control": {"fecha": "2026-11-09", "descripcion": "Control en una semana"},
+}
+
+
+def corregir(sesion, original, autor, cambios=CAMBIO_DE_MEDICAMENTO) -> Atencion:
+    """Crea la adenda con esos cambios respecto de la original y la firma."""
     adenda = crear_adenda(sesion, original, autor, "Medicamento equivocado")
-    campos = {
-        **adenda.campos,
-        "indicaciones_farmacologicas": [{"medicamento": "amoxicilina", "dosis": "5 ml"}],
-        "proximo_control": {"fecha": "2026-11-09", "descripcion": "Control en una semana"},
-    }
-    actualizar_atencion(sesion, adenda, campos, autor)
+    actualizar_atencion(sesion, adenda, {**adenda.campos, **cambios}, autor)
     firmar_atencion(sesion, adenda, autor, PASSWORD)
     sesion.commit()
     return adenda
@@ -165,3 +172,71 @@ def test_no_se_abren_dos_correcciones_a_la_vez(sesion, original, autor):
         crear_adenda(sesion, original, autor, "Otro motivo")
 
     assert error.value.adenda == en_curso
+
+
+# Lo que reportó la revisión del PR #30
+
+
+def test_corregir_una_dosis_no_duplica_la_alergia_ni_la_medicion(sesion, original, autor):
+    adenda = corregir(
+        sesion,
+        original,
+        autor,
+        {"indicaciones_farmacologicas": [{"medicamento": "salbutamol", "dosis": "un puff"}]},
+    )
+
+    alergias = list(sesion.scalars(select(Antecedente)))
+    assert [(a.descripcion, a.atencion_id) for a in alergias] == [("penicilina", adenda.id)]
+    assert [m.atencion_id for m in sesion.scalars(select(Medicion))] == [adenda.id]
+
+
+def test_corregir_una_alergia_mal_registrada_deja_solo_la_correcta(sesion, original, autor):
+    corregir(sesion, original, autor, {"alergias": [{"valor": "amoxicilina", "fragmento": None}]})
+
+    assert list(sesion.scalars(select(Antecedente.descripcion))) == ["amoxicilina"]
+
+
+def test_no_se_corrige_dos_veces_la_misma_atencion(sesion, original, autor):
+    primera = corregir(sesion, original, autor)
+
+    with pytest.raises(AtencionYaCorregida) as error:
+        crear_adenda(sesion, original, autor, "Otro error")
+
+    assert error.value.ultima == primera
+
+
+def test_en_una_cadena_solo_queda_vigente_lo_de_la_ultima_version(sesion, original, autor):
+    primera = corregir(sesion, original, autor)
+    segunda = corregir(
+        sesion,
+        primera,
+        autor,
+        {"indicaciones_farmacologicas": [{"medicamento": "cefadroxilo", "dosis": "4 ml"}]},
+    )
+
+    estados = {t.medicamento: t.estado for t in sesion.scalars(select(Tratamiento))}
+    assert estados == {
+        "salbutamol": EstadoTratamiento.SUSPENDIDO,
+        "amoxicilina": EstadoTratamiento.SUSPENDIDO,
+        "cefadroxilo": EstadoTratamiento.ACTIVO,
+    }
+    assert ultima_version(sesion, original) == segunda
+    assert [a.atencion_id for a in sesion.scalars(select(Antecedente))] == [segunda.id]
+
+
+def test_la_original_se_bloquea_antes_de_revisar_las_correcciones(
+    sesion, original, autor, monkeypatch
+):
+    # Con FOR UPDATE, dos envíos simultáneos en PostgreSQL esperan uno al otro.
+    bloqueos = []
+    refrescar = sesion.refresh
+
+    def espiar(objeto, *args, **kwargs):
+        bloqueos.append((objeto, kwargs.get("with_for_update")))
+        return refrescar(objeto, *args, **kwargs)
+
+    monkeypatch.setattr(sesion, "refresh", espiar)
+
+    crear_adenda(sesion, original, autor, "Medicamento equivocado")
+
+    assert bloqueos[0] == (original, True)

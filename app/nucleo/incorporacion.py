@@ -11,8 +11,9 @@ sin que nadie los copie a mano:
 Los diagnósticos no se copian: quedan en el historial, que son las atenciones firmadas.
 
 Si la atención es una adenda, antes se retira lo que aportó la atención que corrige: sus
-tratamientos vigentes quedan suspendidos y sus controles pendientes, anulados. Así la ficha no
-muestra a la vez el dato corregido y el original.
+tratamientos vigentes quedan suspendidos, sus controles pendientes anulados y sus antecedentes y
+medición se quitan (la adenda trae los suyos). Así la ficha no muestra a la vez el dato corregido
+y el original, ni duplica lo que no cambió.
 
 Se usa a través de app.nucleo.atenciones.incorporar_a_ficha, que es el contrato del esqueleto.
 """
@@ -20,7 +21,7 @@ Se usa a través de app.nucleo.atenciones.incorporar_a_ficha, que es el contrato
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.db import ahora
@@ -86,8 +87,15 @@ def incorporar(sesion: Session, atencion: Atencion, momento: datetime | None = N
 
 
 def _retirar_lo_corregido(sesion: Session, adenda: Atencion, momento: datetime) -> None:
-    """Suspende los tratamientos vigentes y anula los controles pendientes de la atención que la
-    adenda corrige. La suspensión queda a nombre de quien firmó la adenda."""
+    """Retira de la ficha lo que aportó la atención que la adenda corrige:
+
+    - sus tratamientos vigentes quedan suspendidos, a nombre de quien firmó la adenda;
+    - sus controles pendientes quedan anulados;
+    - sus antecedentes y su medición se quitan, porque la adenda vuelve a crear los suyos (que
+      parten de una copia de la original). Si no, una corrección de dosis duplicaría la alergia y
+      corregir una alergia mal registrada dejaría la equivocada. El dato no se pierde: sigue en la
+      atención corregida, que está firmada y no cambia.
+    """
     firmante = sesion.get(UsuarioWeb, adenda.firmada_por)
     motivo = f"Corregido por la atención #{adenda.id}"
     hoy = momento.astimezone(ZONA_HORARIA).date()
@@ -105,6 +113,8 @@ def _retirar_lo_corregido(sesion: Session, adenda: Atencion, momento: datetime) 
     )
     for control in controles:
         control.estado = EstadoControl.ANULADO
+    for modelo in (Antecedente, Medicion):
+        sesion.execute(delete(modelo).where(modelo.atencion_id == adenda.corrige_a_id))
 
 
 def _tratamiento(atencion: Atencion, indicacion: Any, hoy: date) -> Tratamiento | None:
