@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% from "ui/formularios.html" import csrf_field, field, select %}
+{% from "ui/encabezados.html" import page_header %}
+{% from "ui/avisos.html" import alert %}
+{% block titulo %}Adjuntos{% endblock %}
+{% block contenido %}
+{{ page_header("Documentos adjuntos", "Recetas, exámenes e informes asociados a la ficha o a una atención.") }}
+{% if exito %}{% call alert("success", role="status") %}{{ exito }}{% endcall %}{% endif %}
+{% if error %}{% call alert("danger", role="alert") %}{{ error }} Vuelve a seleccionar el archivo antes de enviarlo.{% endcall %}{% endif %}
+<form class="card res-panel" method="get" action="/adjuntos">
+<label class="field__label" for="residente-adjunto">Residente</label>
+<select class="field__control" id="residente-adjunto" name="residente_id" required>
+<option value="" disabled{% if not residente %} selected{% endif %}>Selecciona un residente</option>
+{% for r in residentes %}<option value="{{ r.id }}"{% if residente and r.id == residente.id %} selected{% endif %}>{{ r.codigo }} · {{ r.nombres }} {{ r.apellidos }}</option>{% endfor %}
+</select><div class="res-actions"><button class="btn btn--primary"{% if not residentes %} disabled{% endif %}>Ver documentos</button></div>
+{% if not residentes %}<p>No tienes residentes disponibles. Solicita revisar tus asignaciones a la encargada de salud.</p>{% endif %}
+</form>
+{% if residente %}
+<section class="card res-panel" aria-labelledby="subir-adjunto">
+<h2 id="subir-adjunto">Adjuntar documento · {{ residente.codigo }}</h2>
+<form method="post" action="/adjuntos" enctype="multipart/form-data" data-enviando="Subiendo…">
+{{ csrf_field(csrf) }}<input type="hidden" name="residente_id" value="{{ residente.id }}">
+<div class="res-grid">
+<div class="field"><label class="field__label" for="archivo-adjunto">Archivo (PDF, JPG o PNG; máximo 10 MB)</label><input class="field__control" type="file" id="archivo-adjunto" name="archivo" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" required></div>
+{{ select("tipo", "Tipo de documento", tipos, selected=valores.get("tipo", "informe")) }}
+{{ field("emisor", "Emisor (profesional o institución)", required=True, value=valores.get("emisor", "")) }}
+{{ field("fecha_emision", "Fecha de emisión", type="date", required=True, value=valores.get("fecha_emision", "")) }}
+<div class="field"><label class="field__label" for="atencion-adjunto">Destino</label>
+<select class="field__control" name="atencion_id" id="atencion-adjunto"><option value="">Directamente a la ficha (documento externo)</option>
+{% for a in atenciones %}<option value="{{ a.id }}"{% if a.id == atencion_id %} selected{% endif %}>Atención #{{ a.id }} · {{ a.fecha_atencion or "Sin fecha" }} · {{ a.estado }}</option>{% endfor %}</select></div>
+</div>
+<div class="res-actions"><button class="btn btn--primary">Subir documento</button></div>
+</form></section>
+<section aria-labelledby="documentos-residente"><h2 id="documentos-residente">Documentos de {{ residente.nombres }} {{ residente.apellidos }}</h2>
+<form method="get" action="/adjuntos#documentos-residente" class="res-grid">
+<input type="hidden" name="residente_id" value="{{ residente.id }}">
+{% if atencion_id %}<input type="hidden" name="atencion_id" value="{{ atencion_id }}">{% endif %}
+<div class="field">
+<label class="field__label" for="buscar-documentos">Buscar documentos</label>
+<input class="field__control" type="search" id="buscar-documentos" name="buscar" value="{{ buscar }}" aria-describedby="ayuda-buscar-documentos">
+</div>
+<div class="res-actions"><button class="btn btn--primary">Buscar</button><a class="btn btn--neutral" href="/adjuntos?residente_id={{ residente.id }}{% if atencion_id %}&amp;atencion_id={{ atencion_id }}{% endif %}#documentos-residente">Limpiar</a></div>
+</form>
+<p class="field__help" id="ayuda-buscar-documentos">Nombre del archivo, tipo o emisor.</p>
+<p role="status">{{ adjuntos | length }} de {{ total_documentos }} documentos</p>
+<div class="card res-scroll"><table class="res-table"><thead><tr><th scope="col">Documento</th><th scope="col">Emisor / emisión</th><th scope="col">Destino</th><th scope="col">Descarga</th></tr></thead><tbody>
+{% for adjunto in adjuntos %}<tr><th scope="row">{{ adjunto.nombre_archivo }}<br><small>{{ adjunto.tipo.replace('_', ' ').capitalize() }} · {{ (adjunto.tamano_bytes / 1024) | round(1) }} KB</small></th>
+<td>{{ adjunto.emisor or "Sin emisor informado" }}<br>{{ adjunto.fecha_emision or "Sin fecha informada" }}</td>
+<td>{{ "Atención #" ~ adjunto.atencion_id if adjunto.atencion_id else "Ficha · documento externo" }}</td>
+<td><a href="/adjuntos/{{ adjunto.id }}/descargar">Descargar</a></td></tr>
+{% else %}<tr><td colspan="4">{{ "No hay documentos que coincidan con la búsqueda." if buscar else "No hay documentos adjuntos para este residente." }}</td></tr>{% endfor %}</tbody></table></div></section>
+{% endif %}
+{% endblock %}

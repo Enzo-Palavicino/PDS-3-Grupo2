@@ -42,7 +42,7 @@ def test_las_secciones_pendientes_se_pueden_abrir_sin_ejecutar_servicios(
     cliente, entrar, cuenta
 ):
     entrar(cuenta)
-    rutas = ["/fichas", "/residentes/2", "/atenciones", "/adjuntos"]
+    rutas = ["/fichas", "/residentes/2", "/atenciones"]
     if cuenta == "encargada_salud":
         rutas.append("/digitalizacion")
     for ruta in rutas:
