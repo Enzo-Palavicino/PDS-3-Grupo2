@@ -20,6 +20,12 @@
 {%- endcall %}
 {%- endif %}
 
+{%- if borrador.estado == "confirmado" %}
+{% call alert("success") -%}
+Este borrador ya se revisó y se firmó como la <a href="/atenciones/{{ atencion.id }}">atención #{{ atencion.id }}</a>, que está en la ficha del residente.
+{%- endcall %}
+{%- endif %}
+
 {%- if borrador.estado == "descartado" %}
 {% call alert("neutral") -%}
 Este borrador está descartado. Se conserva para consulta y no puede restaurarse desde la web.
@@ -38,7 +44,7 @@ Revisa cada dato contra su fragmento de origen. Este borrador no es una atenció
   </div>
   <div class="detail__aside">
     {{ review_panel(campos, borrador.faltantes, borrador.ambiguedades, nombres) }}
-    {{ draft_actions(borrador, residente, profesional, puede_descartar, csrf) }}
+    {{ draft_actions(borrador, residente, profesional, puede_descartar, csrf, atencion) }}
   </div>
 </div>
 {% endblock %}

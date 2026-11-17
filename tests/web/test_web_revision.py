@@ -347,3 +347,26 @@ def test_combinar_reemplaza_lo_del_formulario_y_conserva_el_resto():
         "alergias": anteriores["alergias"],
         "especialidad": anteriores["especialidad"],
     }  # "lugar" se vació en el formulario, así que se quita
+
+
+# El borrador después de revisarlo
+
+
+def test_con_la_atencion_creada_el_boton_dice_continuar(cliente, entrar, borrador, atencion):
+    html = cliente.get(f"/borradores/{borrador.id}").text
+
+    assert "Continuar revisión" in html
+    assert "La web no edita campos" not in html
+
+
+def test_un_borrador_firmado_se_ve_confirmado(cliente, entrar, sesion, borrador, atencion):
+    sesion.get(BorradorAtencion, borrador.id).estado = "confirmado"
+    sesion.commit()
+
+    lista = cliente.get("/borradores").text
+    detalle = cliente.get(f"/borradores/{borrador.id}").text
+
+    assert "Confirmado" in lista
+    assert "Pendiente" not in lista
+    assert f'href="/atenciones/{atencion.id}"' in detalle
+    assert "Revisar y completar" not in detalle
