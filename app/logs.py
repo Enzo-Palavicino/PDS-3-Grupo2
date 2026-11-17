@@ -12,7 +12,8 @@ def configurar_logs(nivel: str) -> None:
     # Los clientes HTTP (httpx2 y httpx, con sus capas httpcore) registran cada URL que consultan,
     # y las URL de la Bot API de Telegram llevan el token del bot. Por eso de estas librerías
     # solo se registran advertencias y errores.
-    for nombre in ("httpx2", "httpcore2", "httpx", "httpcore"):
+    # El SDK de OpenAI puede registrar cuerpos de peticiones, incluidas imágenes, en DEBUG.
+    for nombre in ("httpx2", "httpcore2", "httpx", "httpcore", "openai"):
         logging.getLogger(nombre).setLevel(logging.WARNING)
 
 

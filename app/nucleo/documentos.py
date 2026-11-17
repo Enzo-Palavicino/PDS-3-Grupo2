@@ -18,6 +18,7 @@ from app.modelos import (
 )
 from app.nucleo.adjuntos import ArchivoNoPermitido, detectar_mime, guardar_adjunto
 from app.nucleo.auditoria import Accion, registrar_evento
+from app.nucleo.pdf import validar_pdf
 
 MAXIMO_ARCHIVOS = 10
 MAXIMO_LOTE_BYTES = 50 * 1024 * 1024
@@ -42,8 +43,11 @@ def subir_documento(
     tipo_documento = tipo_documento.strip()
     if not tipo_documento or len(tipo_documento) > 120:
         raise ValueError("Indica el tipo de documento (hasta 120 caracteres).")
-    if detectar_mime(contenido) not in ("image/jpeg", "image/png", "application/pdf"):
+    mime = detectar_mime(contenido)
+    if mime not in ("image/jpeg", "image/png", "application/pdf"):
         raise ArchivoNoPermitido("La digitalización admite archivos PDF, JPG o PNG.")
+    if mime == "application/pdf":
+        validar_pdf(contenido)
     adjunto = guardar_adjunto(
         sesion,
         residente_id,

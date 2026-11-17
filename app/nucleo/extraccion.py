@@ -143,6 +143,8 @@ Reglas:
 4. [RUT], [TEL] y [EMAIL] reemplazan datos personales: no los uses como valores.
 5. Escribe las fechas como AAAA-MM-DD y las horas como HH:MM (24 horas). Resuelve las
    expresiones relativas ("hoy", "ayer", "en dos semanas") con la fecha de referencia.
+   Si se indica que no hay fecha de referencia, deja esas fechas en null; nunca uses hoy.
+   Conserva las fechas absolutas que estén escritas explícitamente en el registro.
 6. lugar es "Hogar", "CESFAM", "Hospital Luis Calvo Mackenna" u otro lugar que se nombre.
 7. Cada medicamento indicado es un elemento de indicaciones_farmacologicas. Su fecha_inicio y
    su fecha_termino van solo si el texto las dice: no las calcules con la duración ni supongas
@@ -186,13 +188,13 @@ def extraer_registro(
     texto: str,
     residentes: list[Residente],
     especialidad: str,
-    referencia: datetime,
+    referencia: datetime | None,
     llm: ProveedorLLM,
 ) -> ResultadoExtraccion:
     """Seudonimiza el texto, le pide los campos al LLM y valida su respuesta.
 
-    referencia es el momento en que se recibió el mensaje: con ella se resuelven expresiones
-    como "hoy" o "en dos semanas".
+    referencia es la recepción del mensaje o la fecha original del documento histórico.
+    Si es None, solo se conservan fechas absolutas respaldadas por su fragmento.
     """
     seudonimizado = seudonimizar(texto, residentes)
     entrada = armar_entrada(seudonimizado.texto, residentes, especialidad, referencia)
@@ -202,6 +204,8 @@ def extraer_registro(
     ambiguedades = [a for a in registro.ambiguedades if a.campo != "residente"]
     _descartar_datos_sin_respaldo(registro, seudonimizado.texto, ambiguedades)
     _descartar_fechas_invalidas(registro, ambiguedades)
+    if referencia is None:
+        _descartar_fechas_sin_referencia(registro, ambiguedades)
     codigo = _decidir_residente(registro, seudonimizado, ambiguedades)
     registro.ambiguedades = ambiguedades
 
@@ -217,18 +221,24 @@ def extraer_registro(
 
 
 def armar_entrada(
-    texto: str, residentes: list[Residente], especialidad: str, referencia: datetime
+    texto: str, residentes: list[Residente], especialidad: str, referencia: datetime | None
 ) -> str:
     """Mensaje para el LLM: la fecha de referencia, la especialidad, los códigos de los
     residentes (con nivel y edad, nunca nombres) y el texto ya seudonimizado."""
-    local = referencia.astimezone(ZONA_HORARIA)
+    local = referencia.astimezone(ZONA_HORARIA) if referencia is not None else None
     lista = "\n".join(
-        f"- {r.codigo}: {NIVELES.get(r.nivel, r.nivel)}, {_edad(r.fecha_nacimiento, local.date())}"
+        f"- {r.codigo}: {NIVELES.get(r.nivel, r.nivel)}"
+        + (f", {_edad(r.fecha_nacimiento, local.date())}" if local else "")
         for r in residentes
     )
+    contexto_fecha = (
+        f"Fecha y hora de referencia: {DIAS[local.weekday()]} {local:%Y-%m-%d %H:%M}, hora de Chile."
+        if local else
+        "Fecha original desconocida. No hay fecha de referencia: las fechas relativas "
+        "deben quedar en null, nunca se calculan desde hoy."
+    )
     return (
-        f"Fecha y hora de referencia: {DIAS[local.weekday()]} {local:%Y-%m-%d %H:%M}, "
-        "hora de Chile.\n"
+        f"{contexto_fecha}\n"
         f"Especialidad del profesional: {especialidad}.\n"
         f"Residentes del Hogar (código, nivel y edad):\n{lista}\n\n"
         f"Registro:\n{texto}"
@@ -349,6 +359,48 @@ def _es_fecha(valor: str | None) -> bool:
     except ValueError:  # por ejemplo, 2026-02-30
         return False
     return True
+
+
+MESES = (
+    "enero", "febrero", "marzo", "abril", "mayo", "junio",
+    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+)
+SIN_REFERENCIA = "fecha sin respaldo absoluto ni fecha original conocida"
+
+
+def _fecha_explicita(valor: str, fragmento: str | None) -> bool:
+    fecha = date.fromisoformat(valor)
+    texto = normalizar(fragmento or "")
+    dia, mes, anio = fecha.day, fecha.month, fecha.year
+    patrones = (
+        rf"\b{anio}-0?{mes}-0?{dia}\b",
+        rf"\b0?{dia}[/.-]0?{mes}[/.-]{anio}\b",
+        rf"\b0?{dia}\s+(?:de\s+)?{MESES[mes - 1]}\s+(?:de(?:l)?\s+)?{anio}\b",
+    )
+    return any(re.search(patron, texto) for patron in patrones)
+
+
+def _descartar_fechas_sin_referencia(
+    registro: RegistroExtraido, ambiguedades: list[Ambiguedad]
+) -> None:
+    if registro.fecha_atencion and registro.fecha_atencion.valor:
+        dato = registro.fecha_atencion
+        if not _fecha_explicita(dato.valor, dato.fragmento):
+            registro.fecha_atencion = None
+            ambiguedades.append(Ambiguedad(campo="fecha_atencion", motivo=SIN_REFERENCIA))
+    if registro.proximo_control and registro.proximo_control.fecha:
+        control = registro.proximo_control
+        if not _fecha_explicita(control.fecha, control.fragmento):
+            control.fecha = None
+            ambiguedades.append(Ambiguedad(campo="proximo_control", motivo=SIN_REFERENCIA))
+    for indicacion in registro.indicaciones_farmacologicas:
+        for campo in ("fecha_inicio", "fecha_termino"):
+            valor = getattr(indicacion, campo)
+            if valor and not _fecha_explicita(valor, indicacion.fragmento):
+                setattr(indicacion, campo, None)
+                ambiguedades.append(
+                    Ambiguedad(campo="indicaciones_farmacologicas", motivo=SIN_REFERENCIA)
+                )
 
 
 def _decidir_residente(

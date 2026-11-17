@@ -67,6 +67,26 @@ def motivos(resultado) -> set[tuple[str, str]]:
     return {(a.campo, a.motivo) for a in resultado.registro.ambiguedades}
 
 
+@pytest.mark.parametrize("fragmento", ["12/08/2026", "12-08-2026", "2026-08-12", "12 de agosto de 2026"])
+def test_sin_referencia_solo_conserva_fechas_absolutas_en_su_fragmento(residentes, fragmento):
+    llm = ProveedorLLMFake([json.dumps({
+        "fecha_atencion": {"valor": "2026-08-12", "fragmento": fragmento},
+        "proximo_control": {"fecha": "2026-08-26", "descripcion": "en dos semanas", "fragmento": "en dos semanas"},
+        "indicaciones_farmacologicas": [{
+            "medicamento": "ficticio", "fecha_inicio": "2026-08-12",
+            "fecha_termino": "2026-08-17", "fragmento": "ficticio desde hoy por cinco días",
+        }],
+    })])
+    resultado = extraer_registro(
+        f"Emilia Soto. {fragmento}. Control en dos semanas. ficticio desde hoy por cinco días",
+        residentes, "pediatría", None, llm,
+    )
+    assert resultado.registro.fecha_atencion.valor == "2026-08-12"
+    assert resultado.registro.proximo_control.fecha is None
+    indicacion = resultado.registro.indicaciones_farmacologicas[0]
+    assert indicacion.fecha_inicio is None and indicacion.fecha_termino is None
+
+
 # Lo que recibe el LLM
 
 
