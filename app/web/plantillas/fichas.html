@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{%- from "ui/encabezados.html" import page_header -%}
+{%- from "ui/avisos.html" import empty_state -%}
+{%- from "ui/etiquetas.html" import capitalizar -%}
+{#- Listado de fichas (E1-02). El servidor ya filtró las que el usuario puede abrir. -#}
+{%- set es_profesional = usuario.rol == "profesional" -%}
+{% block titulo %}Fichas{% endblock %}
+{% block clase_main %}page page--list{% endblock %}
+{% block contenido %}
+{{ page_header("Fichas",
+    "Las fichas de tus residentes asignados." if es_profesional
+    else "Las fichas clínicas de todos los residentes.") }}
+{%- if residentes %}
+<div class="card res-scroll"><table class="res-table">
+<caption class="visually-hidden">Fichas</caption>
+<thead><tr><th scope="col">Código</th><th scope="col">Nombre</th><th scope="col">Nivel</th><th scope="col">Estado</th></tr></thead>
+<tbody>
+{%- for residente in residentes %}
+<tr>
+  <td>{{ residente.codigo }}</td>
+  <th scope="row"><a href="/residentes/{{ residente.id }}">{{ residente.nombres }} {{ residente.apellidos }}</a>{% if residente.apodo %}<br><small>{{ residente.apodo }}</small>{% endif %}</th>
+  <td>{{ residente.nivel.replace("_", " ") | capitalize }}</td>
+  <td>{{ capitalizar(residente.estado) }}</td>
+</tr>
+{%- endfor %}
+</tbody>
+</table></div>
+{%- elif es_profesional %}
+{{ empty_state("Todavía no tienes residentes asignados", "La encargada de salud o la dirección te asignan los residentes que atiendes.", icon="users") }}
+{%- else %}
+{{ empty_state("Todavía no hay residentes", "Se registran en la sección Residentes.", icon="users") }}
+{%- endif %}
+{% endblock %}

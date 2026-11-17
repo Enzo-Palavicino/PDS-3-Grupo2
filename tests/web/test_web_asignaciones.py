@@ -38,7 +38,7 @@ def test_retiro_corta_borrador_y_ruta_de_ficha_sin_borrar(cliente, entrar, csrf,
     pid = id_profesional('pediatra')
     entrar('pediatra')
     assert cliente.get(f'/borradores/{borrador.id}').status_code == 200
-    assert cliente.get('/residentes/2').status_code == 501  # E1-02 todavía pendiente
+    assert cliente.get('/residentes/2').status_code == 200
     assert cliente.get('/residentes/3').status_code == 403
     entrar('directora')
     assert cliente.get('/residentes/2').status_code == 403

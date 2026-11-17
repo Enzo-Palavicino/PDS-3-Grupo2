@@ -1,0 +1,10 @@
+/* Ficha del residente (E1-02) y listado de fichas. */
+.page--detail > .section { margin-top: var(--space-6); }
+.page--detail > .section.card { padding: var(--space-6); }
+.ficha-resumen { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: var(--space-6); }
+.ficha-resumen h3, .page--detail .section h3 { margin: 0 0 var(--space-2); font-size: 1rem; }
+.ficha-resumen ul, .page--detail .section > ul { margin: 0; padding-left: 1.25rem; }
+.ficha-atencion { padding: var(--space-4) var(--space-6); margin-top: var(--space-4); }
+.ficha-atencion h3 { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.ficha-atencion .firma { margin-top: var(--space-4); }
+.page--detail .actions { display: flex; flex-wrap: wrap; gap: var(--space-3); margin: var(--space-4) 0 0; }
